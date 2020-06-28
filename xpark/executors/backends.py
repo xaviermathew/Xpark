@@ -12,6 +12,5 @@ class DummyExecutor(BaseExecutor):
         self.max_memory = max_memory
 
     def execute(self, physical_plan):
-        start_node = physical_plan.start_node
-        for op1, op2, in nx.bfs_edges(physical_plan.nx_graph, start_node):
-            print('executing op1:%s op2:%s' % (op1, op2))
+        for op in nx.topological_sort(physical_plan.nx_graph):
+            print('executing op:%s' % op)
