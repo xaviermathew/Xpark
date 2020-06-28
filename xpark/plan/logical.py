@@ -13,7 +13,7 @@ class LogicalPlan(BasePlan):
         g = nx.DiGraph()
         for op1, op2 in take_pairs(pipeline.ops):
             g.add_edge(op1, op2)
-        return cls(g, start_node=pipeline.ops[0])
+        return cls(pipeline.ctx, g, start_node=pipeline.ops[0])
 
 
 class LogicalPlanOp(BaseOp):
@@ -41,7 +41,7 @@ class BaseReadOp(LogicalPlanOp):
         super(BaseReadOp, self).__init__(ctx=ctx, **kwargs)
 
     def get_physical_plan_ops(self, prev_stage):
-        ranges = get_ranges_for_file(self.fname, self.ctx.num_workers, self.ctx.max_memory)
+        ranges = get_ranges_for_file(self.fname, self.ctx.num_executors, self.ctx.max_memory)
         for i, (start, end) in enumerate(ranges):
             yield (self.physical_plan_op_class(self.ctx, self.fname, start, end, part_id=i, stage_id=self.stage_id),
                    SerializeChunkOp(self.ctx, part_id=i, stage_id=self.stage_id))
@@ -61,7 +61,7 @@ class ReadParallelizedOp(LogicalPlanOp):
         super(ReadParallelizedOp, self).__init__(ctx=ctx, **kwargs)
 
     def get_physical_plan_ops(self, prev_stage):
-        ranges = get_ranges_for_iterable(self.iterable, self.ctx.num_workers, self.ctx.max_memory)
+        ranges = get_ranges_for_iterable(self.iterable, self.ctx.num_executors, self.ctx.max_memory)
         for i, (start, end) in enumerate(ranges):
             yield (ReadParallelizedChunkOp(self.ctx, self.iterable, start, end, stage_id=self.stage_id, part_id=i),
                    SerializeChunkOp(self.ctx, stage_id=self.stage_id, part_id=i))

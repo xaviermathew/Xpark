@@ -49,10 +49,10 @@ def get_max_chunk_size_for_file(fname, max_memory, sample_size=100):
     return (max_memory / in_memory_bytes) * num_lines
 
 
-def get_ranges_for_file(fname, num_workers, max_memory):
+def get_ranges_for_file(fname, num_executors, max_memory):
     num_rows = get_line_count(fname)
     max_chunk_size = get_max_chunk_size_for_file(fname, max_memory)
-    num_chunks, chunk_size = get_chunk_info(num_rows, num_workers, max_chunk_size)
+    num_chunks, chunk_size = get_chunk_info(num_rows, num_executors, max_chunk_size)
     return take_pairs(range(0, num_rows, chunk_size))
 
 
@@ -68,8 +68,8 @@ def get_max_chunk_size_for_iterable(iterable, max_memory, sample_size=100):
     return int(math.floor(chunk_size))
 
 
-def get_ranges_for_iterable(iterable, num_workers, max_memory):
+def get_ranges_for_iterable(iterable, num_executors, max_memory):
     num_rows = len(iterable)
     max_chunk_size = get_max_chunk_size_for_iterable(iterable, max_memory)
-    num_chunks, chunk_size = get_chunk_info(num_rows, num_workers, max_chunk_size)
+    num_chunks, chunk_size = get_chunk_info(num_rows, num_executors, max_chunk_size)
     return take_pairs(range(0, num_rows, chunk_size))

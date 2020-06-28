@@ -17,6 +17,7 @@ class BaseOp(object):
 
 
 class BasePlan(object):
-    def __init__(self, nx_graph, start_node):
+    def __init__(self, ctx, nx_graph, start_node):
+        self.ctx = ctx
         self.nx_graph = nx_graph
         self.start_node = start_node

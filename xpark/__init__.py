@@ -1,5 +1,7 @@
 import multiprocessing
 
+from xpark.executors import Executor
+from xpark.executors.backends import DummyExecutor
 from xpark.storage import KVStore, GroupByStore, ResultStore
 from xpark.pipeline import Pipeline
 from xpark.plan.logical import ReadCSVOp, ReadTextOp, ReadParallelizedOp, LogicalStartOp
@@ -7,19 +9,19 @@ from xpark.storage.backends import InMemoryKVBackend, InMemoryGroupByStoreBacken
 
 
 class Context(object):
-    def __init__(self, num_workers=None, max_memory=None, worker_backend=None,
+    def __init__(self, num_executors=None, max_memory=None, executor_backend=None,
                  kv_store_backend=None, groupby_store_backend=None, result_store_backend=None):
-        if num_workers is None:
-            num_workers = multiprocessing.cpu_count()
-        self.num_workers = num_workers
+        if num_executors is None:
+            num_executors = multiprocessing.cpu_count()
+        self.num_executors = num_executors
 
         if max_memory is None:
             max_memory = 1024 * 1024
         self.max_memory = max_memory
 
-        if worker_backend is None:
-            worker_backend = None
-        self.worker_backend = worker_backend
+        if executor_backend is None:
+            executor_backend = DummyExecutor(num_executors, max_memory)
+        self.executor = Executor(self, executor_backend)
 
         if kv_store_backend is None:
             kv_store_backend = InMemoryKVBackend()

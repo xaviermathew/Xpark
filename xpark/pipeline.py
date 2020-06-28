@@ -30,3 +30,7 @@ class Pipeline(object):
         lp = LogicalPlan.from_pipeline(self)
         pp = PhysicalPlan.from_logical_plan(lp)
         return pp
+
+    def collect(self):
+        pp = self.to_graph()
+        return pp.execute()

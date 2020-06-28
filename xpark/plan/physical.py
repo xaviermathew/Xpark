@@ -14,6 +14,7 @@ class PhysicalPlan(BasePlan):
         for op1, op2 in nx.dfs_edges(lp.nx_graph, start_node):
             if prev_stage is None:
                 prev_stage = [list(edge) for edge in op1.get_physical_plan_ops(None)]
+                start_node = prev_stage[0][1]
             curr_stage = list(op2.get_physical_plan_ops(prev_stage))
             if len(prev_stage) != len(curr_stage):
                 if len(prev_stage) == 1:
@@ -27,15 +28,24 @@ class PhysicalPlan(BasePlan):
                 for edge in take_pairs(chain):
                     g.add_edge(*edge)
             prev_stage = curr_stage
-        return cls(g, start_node=start_node)
+        return cls(lp.ctx, g, start_node=start_node)
+
+    def execute(self):
+        return self.ctx.executor.execute(self)
 
 
 class PhysicalPlanOp(BaseOp):
     is_start_op = False
 
+    def get_code(self):
+        raise NotImplementedError
+
 
 class PhysicalStartOp(PhysicalPlanOp):
     is_start_op = True
+
+    def get_code(self):
+        return lambda: None
 
 
 class MapChunkOp(PhysicalPlanOp):
