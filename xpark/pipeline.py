@@ -1,14 +1,12 @@
 import copy
 
-from xpark.plan.logical import LogicalStartOp, MapOp, FilterOp, GroupByKeyOp, LogicalPlan
+from xpark.plan.logical import MapOp, FilterOp, GroupByKeyOp, LogicalPlan
 from xpark.plan.physical import PhysicalPlan
 
 
 class Pipeline(object):
     def __init__(self, ctx, ops):
         self.ctx = ctx
-        if not ops[0].is_start_op:
-            ops.insert(0, LogicalStartOp(self.ctx))
         self.ops = ops
 
     def clone(self):
@@ -16,7 +14,7 @@ class Pipeline(object):
 
     def add_op(self, op_class, *args, **kwargs):
         p = self.clone()
-        p.ops.append(op_class(*args, **kwargs))
+        p.ops.append(op_class(stage_id=self.ctx.get_next_stage_id(), *args, **kwargs))
         return p
 
     def map(self, func):

@@ -112,12 +112,12 @@ class ReadParallelizedChunkOp(PhysicalPlanOp):
         return process
 
 
-class SerializeOp(PhysicalPlanOp):
+class SerializeChunkOp(PhysicalPlanOp):
     reads_data = True
     returns_data = False
 
     def __init__(self, ctx, **kwargs):
-        super(SerializeOp, self).__init__(ctx=ctx, **kwargs)
+        super(SerializeChunkOp, self).__init__(ctx=ctx, **kwargs)
 
     def get_code(self):
         def process(chunk):
@@ -126,13 +126,13 @@ class SerializeOp(PhysicalPlanOp):
         return process
 
 
-class DeserializeOp(PhysicalPlanOp):
+class DeserializeChunkOp(PhysicalPlanOp):
     reads_data = False
     returns_data = True
 
     def __init__(self, ctx, prev_task_id, **kwargs):
         self.prev_task_id = prev_task_id
-        super(DeserializeOp, self).__init__(ctx=ctx, **kwargs)
+        super(DeserializeChunkOp, self).__init__(ctx=ctx, **kwargs)
 
     def get_code(self):
         def process():

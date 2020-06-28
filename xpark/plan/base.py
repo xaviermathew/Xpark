@@ -3,9 +3,9 @@ class BaseOp(object):
     returns_data = True
     reads_data = True
 
-    def __init__(self, ctx, part_id=0):
+    def __init__(self, ctx, stage_id, part_id=0):
         self.ctx = ctx
-        self.stage_id = ctx.get_next_stage_id()
+        self.stage_id = stage_id
         self.part_id = part_id
 
     def __repr__(self):
