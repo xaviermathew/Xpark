@@ -1,7 +1,7 @@
 class BaseOp(object):
     is_start_op = False
-    returns_data = False
-    reads_data = False
+    returns_data = True
+    reads_data = True
 
     def __init__(self, ctx, part_id=0):
         self.ctx = ctx
@@ -9,7 +9,7 @@ class BaseOp(object):
         self.part_id = part_id
 
     def __repr__(self):
-        return '<%s>' % self.__class__.__name__
+        return '<%s>' % self.task_id
 
     @property
     def task_id(self):

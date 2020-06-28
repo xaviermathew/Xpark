@@ -1,8 +1,8 @@
 import multiprocessing
 
-from storage import KVStore, GroupByStore, ResultStore
+from xpark.storage import KVStore, GroupByStore, ResultStore
 from xpark.pipeline import Pipeline
-from xpark.plan.logical import ReadCSVOp, ReadTextOp
+from xpark.plan.logical import ReadCSVOp, ReadTextOp, ReadParallelizedOp
 from xpark.storage.backends import InMemoryKVBackend, InMemoryGroupByStoreBackend
 
 
@@ -47,4 +47,8 @@ class Context(object):
 
     def csv(self, fname):
         op = ReadCSVOp(self, fname)
+        return Pipeline(self, ops=[op])
+
+    def parallelize(self, iterable):
+        op = ReadParallelizedOp(self, iterable)
         return Pipeline(self, ops=[op])

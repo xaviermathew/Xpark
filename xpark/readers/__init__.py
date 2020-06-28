@@ -1,4 +1,5 @@
 import csv
+import itertools
 
 
 def read_csv(fname, start, end, header=True):
@@ -11,8 +12,14 @@ def read_csv(fname, start, end, header=True):
         reader = csv.reader
 
     options['file'] = open(fname)
-    return reader(**options)
+    data = reader(**options)
+    return itertools.islice(data, start, end)
 
 
 def read_text(fname, start, end):
-    return open(fname).iterlines()
+    data = open(fname).iterlines()
+    return itertools.islice(data, start, end)
+
+
+def read_parallelized(iterable, start, end):
+    return itertools.islice(iterable, start, end)

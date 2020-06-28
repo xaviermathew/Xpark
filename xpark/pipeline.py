@@ -1,8 +1,6 @@
-#https://mallikarjuna_g.gitbooks.io/spark/spark-sql-catalyst-Optimizer.html
-
 import copy
 
-from xpark.plan.logical import StartOp, MapOp, FilterOp, GroupByKeyOp, LogicalPlan
+from xpark.plan.logical import LogicalStartOp, MapOp, FilterOp, GroupByKeyOp, LogicalPlan
 from xpark.plan.physical import PhysicalPlan
 
 
@@ -10,7 +8,7 @@ class Pipeline(object):
     def __init__(self, ctx, ops):
         self.ctx = ctx
         if not ops[0].is_start_op:
-            ops.insert(0, StartOp())
+            ops.insert(0, LogicalStartOp(self.ctx))
         self.ops = ops
 
     def clone(self):
