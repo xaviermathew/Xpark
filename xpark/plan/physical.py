@@ -1,98 +1,81 @@
-import networkx as nx
-
 from xpark.plan.base import BasePlan, BaseOp
 from xpark.readers import read_csv, read_text, read_parallelized
-from xpark.utils.iter import take_pairs
-
-
-class PhysicalPlan(BasePlan):
-    @classmethod
-    def from_logical_plan(cls, lp):
-        g = nx.DiGraph()
-        start_node = lp.start_node
-        prev_stage = None
-        for op1, op2 in nx.dfs_edges(lp.nx_graph, start_node):
-            if prev_stage is None:
-                prev_stage = [list(edge) for edge in op1.get_physical_plan_ops(None)]
-                start_node = prev_stage[0][1]
-            curr_stage = list(op2.get_physical_plan_ops(prev_stage))
-            if len(prev_stage) != len(curr_stage):
-                if len(prev_stage) == 1:
-                    chains = [(prev_stage[0][-1], *edge) for edge in curr_stage]
-                else:
-                    raise RuntimeError
-            else:
-                chains = [(prev_stage[i][-1], *edge) for i, edge in enumerate(curr_stage)]
-
-            for chain in chains:
-                for edge in take_pairs(chain):
-                    g.add_edge(*edge)
-            prev_stage = curr_stage
-        return cls(lp.ctx, g, start_node=start_node)
-
-    def execute(self):
-        return self.ctx.executor.execute(self)
 
 
 class PhysicalPlanOp(BaseOp):
-    is_start_op = False
+    def __repr__(self):
+        return '<%s>' % self.task_id
+
+    @property
+    def task_id(self):
+        return '%s.%s.%s' % (self.plan.ctx.job_id, self.__class__.__name__, self.part_id)
 
     def get_code(self):
         raise NotImplementedError
 
 
 class PhysicalStartOp(PhysicalPlanOp):
-    is_start_op = True
+    reads_data = False
+    returns_data = False
 
     def get_code(self):
         return lambda: None
 
 
-class MapChunkOp(PhysicalPlanOp):
-    def get_code(self):
-        return map
+class FunctionChunkOp(PhysicalPlanOp):
+    physical_plan_op_class = None
+
+    def __init__(self, plan, func, part_id):
+        self.func = func
+        super(__class__, self).__init__(plan, part_id)
 
 
-class FilterChunkOp(PhysicalPlanOp):
+class MapChunkOp(FunctionChunkOp):
     def get_code(self):
-        return filter
+        def process(chunk):
+            return map(self.func, chunk[0])
+        return process
+
+
+class FilterChunkOp(FunctionChunkOp):
+    def get_code(self):
+        def process(chunk):
+            return filter(self.func, chunk[0])
+        return process
+
+
+class CollectOp(PhysicalPlanOp):
+    def get_code(self):
+        def process(all_results):
+            for result in all_results:
+                yield from result
+        return process
 
 
 class GroupChunkByKeykOp(PhysicalPlanOp):
     returns_data = False
 
     def get_code(self):
-        def process_chunk(chunk):
+        barrier_op = list(self.plan.g.successors(self))[0]
+        def process(chunk):
             for key, d in chunk:
-                self.ctx.groupby_store_backend.append(self.task_id, key, d)
-        return process_chunk
+                self.plan.ctx.groupby_store_backend.append(barrier_op.task_id, key, d)
+        return process
 
 
-class MergeGroupByResults(PhysicalPlanOp):
-    reads_data = True
-
-    def __init__(self, ctx, group_chunk_task_ids, **kwargs):
-        self.group_chunk_task_ids = group_chunk_task_ids
-        super(MergeGroupByResults, self).__init__(ctx=ctx, **kwargs)
-
+class GroupByBarrierOp(PhysicalPlanOp):
     def get_code(self):
-        def process_results():
-            merged = self.ctx.groupby_store_backend
-            for task_id in self.group_chunk_task_ids:
-                for k, v_set in self.ctx.result_store[task_id].items():
-                    merged.extend(k, v_set)
-            return merged
-        return process_results
+        return lambda: None
 
 
 class BasePhysicalReadOp(PhysicalPlanOp):
     reads_data = False
 
-    def __init__(self, ctx, fname, start, end, **kwargs):
+    def __init__(self, plan, fname, start, end, **kwargs):
         self.fname = fname
         self.start = start
         self.end = end
-        super(BasePhysicalReadOp, self).__init__(ctx=ctx, **kwargs)
+        super(BasePhysicalReadOp, self).__init__(plan, **kwargs)
 
 
 class ReadCSVChunkOp(BasePhysicalReadOp):
@@ -110,11 +93,13 @@ class ReadTextChunkOp(BasePhysicalReadOp):
 
 
 class ReadParallelizedChunkOp(PhysicalPlanOp):
-    def __init__(self, ctx, iterable, start, end, **kwargs):
+    reads_data = False
+
+    def __init__(self, plan, iterable, start, end, **kwargs):
         self.iterable = iterable
         self.start = start
         self.end = end
-        super(ReadParallelizedChunkOp, self).__init__(ctx, **kwargs)
+        super(ReadParallelizedChunkOp, self).__init__(plan, **kwargs)
 
     def get_code(self):
         def process():
@@ -123,29 +108,25 @@ class ReadParallelizedChunkOp(PhysicalPlanOp):
 
 
 class SerializeChunkOp(PhysicalPlanOp):
-    reads_data = True
     returns_data = False
-
-    def __init__(self, ctx, **kwargs):
-        super(SerializeChunkOp, self).__init__(ctx=ctx, **kwargs)
 
     def get_code(self):
         def process(chunk):
-            s = self.ctx.result_store.dumps(chunk)
-            self.ctx.result_store[self.task_id] = s
+            self.plan.ctx.result_store.set(self.task_id, list(chunk[0]))
         return process
 
 
 class DeserializeChunkOp(PhysicalPlanOp):
     reads_data = False
-    returns_data = True
-
-    def __init__(self, ctx, prev_task_id, **kwargs):
-        self.prev_task_id = prev_task_id
-        super(DeserializeChunkOp, self).__init__(ctx=ctx, **kwargs)
 
     def get_code(self):
         def process():
-            s = self.ctx.result_store[self.prev_task_id]
-            return self.ctx.result_store.loads(s)
+            return self.plan.ctx.result_store.get(self.prev_op.task_id)
         return process
+
+
+class PhysicalPlan(BasePlan):
+    start_node_class = PhysicalStartOp
+
+    def execute(self):
+        return self.ctx.executor.execute(self)

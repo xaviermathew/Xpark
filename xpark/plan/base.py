@@ -1,23 +1,42 @@
-class BaseOp(object):
-    is_start_op = False
-    returns_data = True
-    reads_data = True
+import networkx as nx
 
-    def __init__(self, ctx, stage_id, part_id=0):
-        self.ctx = ctx
-        self.stage_id = stage_id
+
+class BaseOp(object):
+    reads_data = True
+    returns_data = True
+
+    def __init__(self, plan, part_id=0):
+        self.plan = plan
         self.part_id = part_id
 
-    def __repr__(self):
-        return '<%s>' % self.task_id
+    @property
+    def prev_op(self):
+        nodes = list(self.plan.g.predecessors(self))
+        if len(nodes) == 1:
+            return nodes[0]
+        else:
+            raise RuntimeError('more than 1 predecessor')
 
     @property
-    def task_id(self):
-        return '%s.%s.%s.%s' % (self.ctx.job_id, self.stage_id, self.__class__.__name__, self.part_id)
+    def next_op(self):
+        nodes = list(self.plan.g.successors(self))
+        if len(nodes) == 1:
+            return nodes[0]
+        else:
+            raise RuntimeError('more than 1 successor')
+
+    def add_op(self, op):
+        self.plan.g.add_edge(self, op)
 
 
 class BasePlan(object):
-    def __init__(self, ctx, nx_graph, start_node):
+    start_node_class = None
+
+    def __init__(self, ctx):
         self.ctx = ctx
-        self.nx_graph = nx_graph
-        self.start_node = start_node
+        self.g = nx.DiGraph()
+        self.start_node = self.start_node_class(self)
+        self.g.add_node(self.start_node)
+
+    def execute(self):
+        raise NotImplementedError

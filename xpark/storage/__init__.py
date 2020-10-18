@@ -39,13 +39,11 @@ class GroupByStore(KVStore):
 
 
 class ResultStore(BaseStore):
-    def get(self, task_id, key):
-        key = self.get_key(task_id, key)
-        return self.backend.get(key)
+    def get(self, task_id):
+        return self.backend.get(task_id)
 
-    def set(self, task_id, key, value):
-        key = self.get_key(task_id, key)
-        return self.backend.set(key, value)
+    def set(self, task_id, value):
+        return self.backend.set(task_id, value)
 
     def clear(self):
         return self.backend.clear()

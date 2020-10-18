@@ -2,49 +2,62 @@ import networkx as nx
 
 from xpark.plan.base import BaseOp, BasePlan
 from xpark.plan.physical import ReadCSVChunkOp, ReadTextChunkOp, PhysicalStartOp, SerializeChunkOp, \
-    DeserializeChunkOp, MapChunkOp, FilterChunkOp, GroupChunkByKeykOp, MergeGroupByResults, \
-    ReadParallelizedChunkOp
-from xpark.utils.iter import take_pairs, get_ranges_for_file, get_ranges_for_iterable
-
-
-class LogicalPlan(BasePlan):
-    @classmethod
-    def from_pipeline(cls, pipeline):
-        g = nx.DiGraph()
-        for op1, op2 in take_pairs(pipeline.ops):
-            g.add_edge(op1, op2)
-        return cls(pipeline.ctx, g, start_node=pipeline.ops[0])
+    DeserializeChunkOp, MapChunkOp, FilterChunkOp, GroupChunkByKeykOp, GroupByBarrierOp, \
+    ReadParallelizedChunkOp, CollectOp as PhysicalCollectOp, PhysicalPlan
+from xpark.utils.iter import get_ranges_for_file, get_ranges_for_iterable
 
 
 class LogicalPlanOp(BaseOp):
-    takes_input = False
-    returns_input = False
+    def map(self, func):
+        op = MapOp(self.plan, func)
+        self.add_op(op)
+        return op
 
-    def get_physical_plan_ops(self, prev_stage):
+    def filter(self, func):
+        op = FilterOp(self.plan, func)
+        self.add_op(op)
+        return op
+
+    def groupByKey(self):
+        op = GroupByKeyOp(self.plan)
+        self.add_op(op)
+        return op
+
+    def collect(self):
+        op = CollectOp(self.plan)
+        self.add_op(op)
+        return op
+
+    def get_physical_plan(self, prev_ops, pplan):
         raise NotImplementedError
 
 
 class LogicalStartOp(LogicalPlanOp):
-    is_start_op = True
-
-    def get_physical_plan_ops(self, prev_stage):
-        return [
-            (None, PhysicalStartOp(self.ctx, stage_id=self.stage_id))
-        ]
+    def get_physical_plan(self, prev_ops, pplan):
+        g = nx.DiGraph()
+        op = PhysicalStartOp(pplan)
+        for prev_op in prev_ops:
+            g.add_edge(prev_op, op)
+        return g
 
 
 class BaseReadOp(LogicalPlanOp):
     physical_plan_op_class = None
 
-    def __init__(self, ctx, fname, **kwargs):
+    def __init__(self, plan, fname):
         self.fname = fname
-        super(BaseReadOp, self).__init__(ctx=ctx, **kwargs)
+        super(__class__, self).__init__(plan)
 
-    def get_physical_plan_ops(self, prev_stage):
-        ranges = get_ranges_for_file(self.fname, self.ctx.num_executors, self.ctx.max_memory)
+    def get_physical_plan(self, prev_ops, pplan):
+        g = nx.DiGraph()
+        ranges = get_ranges_for_file(self.fname, self.plan.ctx.num_executors, self.plan.ctx.max_memory)
         for i, (start, end) in enumerate(ranges):
-            yield (self.physical_plan_op_class(self.ctx, self.fname, start, end, part_id=i, stage_id=self.stage_id),
-                   SerializeChunkOp(self.ctx, part_id=i, stage_id=self.stage_id))
+            read_op = self.physical_plan_op_class(pplan, self.fname, start, end, part_id=i)
+            for prev_op in prev_ops:
+                g.add_edge(prev_op, read_op)
+            ser_op = SerializeChunkOp(pplan, part_id=i)
+            g.add_edge(read_op, ser_op)
+        return g
 
 
 class ReadTextOp(BaseReadOp):
@@ -56,47 +69,86 @@ class ReadCSVOp(BaseReadOp):
 
 
 class ReadParallelizedOp(LogicalPlanOp):
-    def __init__(self, ctx, iterable, **kwargs):
+    def __init__(self, plan, iterable):
         self.iterable = iterable
-        super(ReadParallelizedOp, self).__init__(ctx=ctx, **kwargs)
+        super(__class__, self).__init__(plan)
 
-    def get_physical_plan_ops(self, prev_stage):
-        ranges = get_ranges_for_iterable(self.iterable, self.ctx.num_executors, self.ctx.max_memory)
+    def get_physical_plan(self, prev_ops, pplan):
+        g = nx.DiGraph()
+        ranges = get_ranges_for_iterable(self.iterable, self.plan.ctx.num_executors, self.plan.ctx.max_memory)
         for i, (start, end) in enumerate(ranges):
-            yield (ReadParallelizedChunkOp(self.ctx, self.iterable, start, end, stage_id=self.stage_id, part_id=i),
-                   SerializeChunkOp(self.ctx, stage_id=self.stage_id, part_id=i))
+            read_op = ReadParallelizedChunkOp(pplan, self.iterable, start, end, part_id=i)
+            for prev_op in prev_ops:
+                g.add_edge(prev_op, read_op)
+            ser_op = SerializeChunkOp(pplan, part_id=i)
+            g.add_edge(read_op, ser_op)
+        return g
 
 
-class SimpleLogicalOp(LogicalPlanOp):
+class FunctionOp(LogicalPlanOp):
     physical_plan_op_class = None
 
-    def __init__(self, ctx, func, **kwargs):
+    def __init__(self, plan, func):
         self.func = func
-        super(SimpleLogicalOp, self).__init__(ctx, **kwargs)
+        super(__class__, self).__init__(plan)
 
-    def get_physical_plan_ops(self, prev_stage):
-        for edge in prev_stage:
-            op = [op for op in edge if not isinstance(op, (SerializeChunkOp, DeserializeChunkOp))][0]
-            yield (DeserializeChunkOp(self.ctx, prev_task_id=op.task_id, stage_id=self.stage_id, part_id=op.part_id),
-                   self.physical_plan_op_class(self.ctx, stage_id=self.stage_id, part_id=op.part_id),
-                   SerializeChunkOp(self.ctx, stage_id=self.stage_id, part_id=op.part_id))
+    def get_physical_plan(self, prev_ops, pplan):
+        g = nx.DiGraph()
+        for i, prev_op in enumerate(prev_ops):
+            deser_op = DeserializeChunkOp(pplan, part_id=i)
+            g.add_edge(prev_op, deser_op)
+            op = self.physical_plan_op_class(pplan, part_id=i, func=self.func)
+            g.add_edge(deser_op, op)
+            ser_op = SerializeChunkOp(pplan, part_id=i)
+            g.add_edge(op, ser_op)
+        return g
 
 
-class MapOp(SimpleLogicalOp):
+class MapOp(FunctionOp):
     physical_plan_op_class = MapChunkOp
 
 
-class FilterOp(SimpleLogicalOp):
+class FilterOp(FunctionOp):
     physical_plan_op_class = FilterChunkOp
 
 
-class GroupByKeyOp(SimpleLogicalOp):
-    def get_physical_plan_ops(self, prev_stage):
-        group_chunk_task_ids = []
-        for op in prev_stage:
-            g_op = GroupChunkByKeykOp(self.ctx, stage_id=self.stage_id, part_id=op.part_id)
-            group_chunk_task_ids.append(g_op.task_id)
-            yield (DeserializeChunkOp(self.ctx, prev_task_id=op.task_id, stage_id=self.stage_id, part_id=op.part_id),
-                   g_op,
-                   SerializeChunkOp(self.ctx, stage_id=self.stage_id, part_id=op.part_id))
-        yield MergeGroupByResults(self.ctx, group_chunk_task_ids, stage_id=self.stage_id)
+class GroupByKeyOp(LogicalPlanOp):
+    def get_physical_plan(self, prev_ops, pplan):
+        g = nx.DiGraph()
+        barrier_op = GroupByBarrierOp(pplan)
+        for i, prev_op in enumerate(prev_ops):
+            deser_op = DeserializeChunkOp(pplan, part_id=i)
+            g.add_edge(prev_op, deser_op)
+            op = GroupChunkByKeykOp(pplan, part_id=i)
+            g.add_edge(deser_op, op)
+            ser_op = SerializeChunkOp(pplan, part_id=i)
+            g.add_edge(op, ser_op)
+            g.add_edge(ser_op, barrier_op)
+        return g
+
+
+class CollectOp(LogicalPlanOp):
+    def get_physical_plan(self, prev_ops, pplan):
+        g = nx.DiGraph()
+        op = PhysicalCollectOp(pplan)
+        for i, prev_op in enumerate(prev_ops):
+            deser_op = DeserializeChunkOp(pplan, part_id=i)
+            g.add_edge(prev_op, deser_op)
+            g.add_edge(deser_op, op)
+        return g
+
+
+class LogicalPlan(BasePlan):
+    start_node_class = LogicalStartOp
+
+    def to_physical_plan(self):
+        pplan = PhysicalPlan(self.ctx)
+        prev_nodes = [pplan.start_node]
+        for n1, n2 in nx.dfs_edges(self.g, source=self.start_node):
+            n2g = n2.get_physical_plan(prev_nodes, pplan)
+            pplan.g.update(n2g)
+            prev_nodes = [x for x in n2g.nodes() if n2g.out_degree(x) == 0 and n2g.in_degree(x) == 1]
+        return pplan
+
+    def execute(self):
+        return self.to_physical_plan().execute()
