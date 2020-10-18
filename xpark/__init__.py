@@ -35,22 +35,21 @@ class Context(object):
         self.result_store = ResultStore(self, result_store_backend)
 
         self.job_id = 1
-        self.logical_plan = LogicalPlan(self)
 
     def text(self, fname):
-        op = ReadTextOp(self.logical_plan, fname)
-        self.logical_plan.start_node.add_op(op)
+        lp = LogicalPlan(self)
+        op = ReadTextOp(lp, fname)
+        lp.start_node.add_op(op)
         return op
 
     def csv(self, fname):
-        op = ReadCSVOp(self.logical_plan, fname)
-        self.logical_plan.start_node.add_op(op)
+        lp = LogicalPlan(self)
+        op = ReadCSVOp(lp, fname)
+        lp.start_node.add_op(op)
         return op
 
     def parallelize(self, iterable):
-        op = ReadParallelizedOp(self.logical_plan, iterable)
-        self.logical_plan.start_node.add_op(op)
+        lp = LogicalPlan(self)
+        op = ReadParallelizedOp(lp, iterable)
+        lp.start_node.add_op(op)
         return op
-
-    def execute(self):
-        return self.logical_plan.execute()
