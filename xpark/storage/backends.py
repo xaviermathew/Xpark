@@ -30,6 +30,21 @@ class InMemoryGroupByStoreBackend(BaseInMemoryBackend):
     def get(self, key):
         return self.data[key]
 
+    def _trim_key(self, prefix, key):
+        # "+ 1" to remove the trailing ":"
+        return key[len(prefix) + 1:]
+
+    def get_keys(self, key, trim_key=True):
+        for k in self.data.keys():
+            if k.startswith(key):
+                if trim_key:
+                    k = self._trim_key(key, k)
+                yield k
+
+    def get_items(self, key):
+        for k in self.get_keys(key, trim_key=False):
+            yield self._trim_key(key, k), self.get(k)
+
     def append(self, key, value):
         return self.data[key].append(value)
 

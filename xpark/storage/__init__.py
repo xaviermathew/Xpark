@@ -26,6 +26,12 @@ class GroupByStore(KVStore):
         key = self.get_key(task_id, key)
         return self.backend.get(key)
 
+    def get_keys(self, task_id):
+        return self.backend.get_keys(task_id)
+
+    def get_items(self, task_id):
+        return self.backend.get_items(task_id)
+
     def append(self, task_id, key, value):
         key = self.get_key(task_id, key)
         return self.backend.append(key, value)
