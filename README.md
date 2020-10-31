@@ -20,20 +20,16 @@
 
 
 >>> df = ctx.List([
-...     {'x': 1, 'y': 1, 'z': 1, 'w': 1},
-...     {'x': 2, 'y': 2, 'z': 2, 'w': 2},
+...     {'x': 1, 'y': 1, 'z': 1},
+...     {'x': 2, 'y': 2, 'z': 2},
 ... ]).toDF()
-
->>> print(list(df['z'].execute()))
+>>> print(list(df['x'].execute()))
 [1, 2]
-
+>>> df['x'] = df['y'] + df['z']
 >>> print(list(df['x'].execute()))
 [2, 4]
-
->>> df['x'] = df['y'] + df['z']
 >>> print(list((df['x'] * 2).execute()))
 [4, 8]
-
 >>> print(list(df.execute()))
-[{'x': 2, 'y': 1, 'z': 1, 'w': 1}, {'x': 4, 'y': 2, 'z': 2, 'w': 2}]
+[{'x': 2, 'y': 1, 'z': 1}, {'x': 4, 'y': 2, 'z': 2}]
 ```
