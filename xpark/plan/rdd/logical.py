@@ -1,7 +1,7 @@
 import networkx as nx
 
 from xpark.plan.base import BaseOp, BasePlan
-from xpark.plan.physical import ReadCSVChunkOp, ReadTextChunkOp, PhysicalStartOp, SerializeChunkOp, \
+from xpark.plan.rdd.physical import ReadCSVChunkOp, ReadTextChunkOp, PhysicalStartOp, SerializeChunkOp, \
     DeserializeChunkOp, MapChunkOp, FilterChunkOp, GroupChunkByKeykOp, GroupByBarrierOp, \
     ReadParallelizedChunkOp, CollectOp as PhysicalCollectOp, PhysicalPlan, PostGroupByReadOp
 from xpark.utils.iter import get_ranges_for_file, get_ranges_for_iterable

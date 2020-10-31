@@ -3,7 +3,7 @@ import multiprocessing
 from xpark.executors import Executor
 from xpark.executors.backends import SimpleExecutor
 from xpark.storage import KVStore, GroupByStore, ResultStore
-from xpark.plan.logical import ReadCSVOp, ReadTextOp, ReadParallelizedOp, LogicalStartOp, LogicalPlan
+from xpark.plan.rdd.logical import ReadCSVOp, ReadTextOp, ReadParallelizedOp, LogicalStartOp, LogicalPlan
 from xpark.storage.backends import InMemoryKVBackend, InMemoryGroupByStoreBackend
 
 
