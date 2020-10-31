@@ -1,5 +1,6 @@
 class Dataset(object):
-    def __init__(self, cols):
+    def __init__(self, ctx, cols):
+        self.ctx = ctx
         self.cols = cols
 
     def __repr__(self):
@@ -10,9 +11,9 @@ class Dataset(object):
 
 
 class List(Dataset):
-    def __init__(self, data):
+    def __init__(self, ctx, data):
         self.data = data
-        super(__class__, self).__init__(cols=data[0].keys())
+        super(__class__, self).__init__(ctx=ctx, cols=data[0].keys())
 
     def __repr__(self):
         data_repr = str(self.data)
@@ -23,3 +24,7 @@ class List(Dataset):
     def get_col(self, name):
         for d in self.data:
             yield d[name]
+
+    def toDF(self):
+        from xpark.plan.dataframe.dataframe import DataFrame
+        return DataFrame(self)

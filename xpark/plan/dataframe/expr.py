@@ -3,82 +3,94 @@ import types
 
 
 class Expr(object):
-    def __init__(self, s, rhs=None, operator=None):
+    def __init__(self, ctx, s, rhs=None, operator_str=None):
+        self.ctx = ctx
         self.s = s
         self.rhs = rhs
-        self.operator = operator
+        self.operator_str = operator_str
 
     def __repr__(self):
         if self.rhs is None:
             return 'Expr:(%s)' % self.s
         else:
-            return 'Expr:(%s %s %s)' % (self.s, self.operator, self.rhs)
+            return 'Expr:(%s %s %s)' % (self.s, self.operator_str, self.rhs)
 
     def copy(self):
-        return Expr(s=self)
+        return Expr(ctx=self.ctx, s=self)
 
-    def from_children(self, rhs, operator):
+    def from_children(self, rhs, operator_str):
         if rhs is None:
             raise ValueError('rhs cant be none')
         if operator is None:
             raise ValueError('operator cant be none')
         new_op = self.copy()
         new_op.rhs = rhs
-        new_op.operator = operator
+        new_op.operator_str = operator_str
         return new_op
 
     @staticmethod
-    def from_pair(x, y, operator):
+    def from_pair(ctx, x, y, operator_str):
         if not isinstance(x, Expr):
-            x = Expr(x)
+            x = Expr(ctx, x)
         if not isinstance(y, Expr):
-            y = Expr(y)
-        return x.from_children(y, operator)
+            y = Expr(ctx, y)
+        return x.from_children(y, operator_str)
 
-    @staticmethod
-    def eval_binary_expression(lhs, operator, rhs):
-        return SimpleEvaluator().apply(lhs, operator, rhs)
+    def execute_binary_expression(self, lhs, operator_str, rhs):
+        return self.ctx.df_expression_evaluator.apply(lhs, operator_str, rhs)
 
-    def eval_node(self):
+    def execute_node(self):
         from xpark.plan.dataframe.dataframe import Col
 
         if isinstance(self.s, Col):
-            return self.s.eval()
+            return self.s.execute()
         elif isinstance(self.s, Expr):
-            return self.s.eval()
+            return self.s.execute()
         else:
             return self.s
 
-    def eval(self):
+    def execute(self):
         if self.rhs:
-            results = [self.eval_node(), self.operator, self.rhs.eval()]
-            return self.eval_binary_expression(*results)
+            results = [self.execute_node(), self.operator_str, self.rhs.execute()]
+            return self.execute_binary_expression(*results)
         else:
-            return self.eval_node()
+            return self.execute_node()
 
     def __add__(self, rhs):
-        return Expr.from_pair(self, rhs, operator.add)
+        return Expr.from_pair(self.ctx, self, rhs, '+')
 
     def __sub__(self, rhs):
-        return Expr.from_pair(self, rhs, operator.sub)
+        return Expr.from_pair(self.ctx, self, rhs, '-')
 
     def __mul__(self, rhs):
-        return Expr.from_pair(self, rhs, operator.mul)
+        return Expr.from_pair(self.ctx, self, rhs, '*')
 
     def __div__(self, rhs):
-        return Expr.from_pair(self, rhs, operator.floordiv)
+        return Expr.from_pair(self.ctx, self, rhs, '/')
 
     def __and__(self, rhs):
-        return Expr.from_pair(self, rhs, operator.and_)
+        return Expr.from_pair(self.ctx, self, rhs, '&')
 
     def __or__(self, rhs):
-        return Expr.from_pair(self, rhs, operator.or_)
+        return Expr.from_pair(self.ctx, self, rhs, '|')
 
 
 class SimpleEvaluator(object):
-    def apply(self, lhs, operator, rhs):
+    operator_map = {
+        '+': operator.add,
+        '-': operator.sub,
+        '*': operator.mul,
+        '/': operator.floordiv,
+        '&': operator.and_,
+        '|': operator.or_,
+    }
+
+    def __init__(self, ctx):
+        self.ctx = ctx
+
+    def apply(self, lhs, operator_str, rhs):
         is_lhs_gen = isinstance(lhs, types.GeneratorType)
-        is_rhs_gen = isinstance(lhs, types.GeneratorType)
+        is_rhs_gen = isinstance(rhs, types.GeneratorType)
         if is_lhs_gen and is_rhs_gen:
             lhs = list(lhs)
             rhs = list(rhs)
@@ -88,5 +100,7 @@ class SimpleEvaluator(object):
         elif not is_lhs_gen and is_rhs_gen:
             rhs = list(rhs)
             lhs = [lhs] * len(rhs)
+
+        operator_func = self.operator_map[operator_str]
         for i, l in enumerate(lhs):
-            yield operator(l, rhs[i])
+            yield operator_func(l, rhs[i])

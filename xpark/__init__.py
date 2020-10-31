@@ -3,13 +3,15 @@ import multiprocessing
 from xpark.executors import Executor
 from xpark.executors.backends import SimpleExecutor
 from xpark.storage import KVStore, GroupByStore, ResultStore
+from xpark.plan.dataframe.expr import SimpleEvaluator
 from xpark.plan.rdd.logical import ReadCSVOp, ReadTextOp, ReadParallelizedOp, LogicalStartOp, LogicalPlan
 from xpark.storage.backends import InMemoryKVBackend, InMemoryGroupByStoreBackend
 
 
 class Context(object):
     def __init__(self, num_executors=None, max_memory=None, executor_backend=None,
-                 kv_store_backend=None, groupby_store_backend=None, result_store_backend=None):
+                 kv_store_backend=None, groupby_store_backend=None, result_store_backend=None,
+                 df_expression_evaluator=None):
         if num_executors is None:
             num_executors = multiprocessing.cpu_count()
         self.num_executors = num_executors
@@ -34,6 +36,10 @@ class Context(object):
             result_store_backend = InMemoryKVBackend()
         self.result_store = ResultStore(self, result_store_backend)
 
+        if df_expression_evaluator is None:
+            df_expression_evaluator = SimpleEvaluator(self)
+        self.df_expression_evaluator = df_expression_evaluator
+
         self.job_id = 1
 
     def text(self, fname):
@@ -53,3 +59,7 @@ class Context(object):
         op = ReadParallelizedOp(lp, iterable)
         lp.start_node.add_op(op)
         return op
+
+    def List(self, data):
+        from xpark.plan.dataframe.dataset import List
+        return List(self, data)

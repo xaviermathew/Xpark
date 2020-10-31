@@ -1,4 +1,7 @@
+import logging
 import networkx as nx
+
+_LOG = logging.getLogger(__name__)
 
 
 class MisconfiguredGraph(Exception):
@@ -29,7 +32,7 @@ class SimpleExecutor(BaseExecutor):
         result_map = {}
         ppg = physical_plan.g
         for op in nx.topological_sort(ppg):
-            print('executing op:%s' % op)
+            _LOG.debug('executing op:%s' % op)
             fn = op.get_code()
             if op.reads_data:
                 results = []
