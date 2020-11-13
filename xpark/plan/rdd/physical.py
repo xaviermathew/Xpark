@@ -1,5 +1,5 @@
-from xpark.plan.base import BasePlan, BaseOp
-from xpark.readers import read_csv, read_text, read_parallelized
+from xpark.plan.base import BaseOp, BasePhysicalPlan
+from xpark.dataset.readers import read_parallelized
 from xpark.utils.iter import get_ranges_for_iterable
 
 
@@ -76,37 +76,16 @@ class BasePhysicalReadOp(PhysicalPlanOp):
     reads_data = False
     chunk_reader_function = None
 
-    def __init__(self, plan, part_id, start, end, crf_kwargs={}):
+    def __init__(self, plan, part_id, start, end, dataset):
         self.start = start
         self.end = end
-        self.crf_kwargs = crf_kwargs
+        self.dataset = dataset
         super(BasePhysicalReadOp, self).__init__(plan, part_id)
 
     def get_code(self):
         def process():
-            return self.chunk_reader_function.__func__(start=self.start, end=self.end, **self.crf_kwargs)
+            return self.dataset.read_chunk(self.start, self.end)
         return process
-
-
-class ReadCSVChunkOp(BasePhysicalReadOp):
-    chunk_reader_function = read_csv
-
-    def __init__(self, plan, part_id, start, end, fname):
-        super(__class__, self).__init__(plan, part_id, start, end, crf_kwargs={'fname': fname})
-
-
-class ReadTextChunkOp(BasePhysicalReadOp):
-    chunk_reader_function = read_text
-
-    def __init__(self, plan, part_id, start, end, fname):
-        super(__class__, self).__init__(plan, part_id, start, end, crf_kwargs={'fname': fname})
-
-
-class ReadParallelizedChunkOp(BasePhysicalReadOp):
-    chunk_reader_function = read_parallelized
-
-    def __init__(self, plan, part_id, start, end, iterable):
-        super(__class__, self).__init__(plan, part_id, start, end, crf_kwargs={'iterable': iterable})
 
 
 class PostGroupByReadOp(PhysicalPlanOp):
@@ -143,8 +122,5 @@ class DeserializeChunkOp(PhysicalPlanOp):
         return process
 
 
-class PhysicalPlan(BasePlan):
+class PhysicalPlan(BasePhysicalPlan):
     start_node_class = PhysicalStartOp
-
-    def execute(self):
-        return self.ctx.executor.execute(self)

@@ -1,0 +1,2 @@
+class MisconfiguredGraph(Exception):
+    pass

@@ -19,20 +19,16 @@
 [(False, [9, 7, 3, 5, 1]), (True, [6, 8, 4, 0, 2])]
 
 
->>> df = ctx.List([
+>>> import xpark
+>>> ctx=xpark.Context()
+>>> df = ctx.parallelize([
 ...     {'x': 1, 'y': 1, 'z': 1},
 ...     {'x': 2, 'y': 2, 'z': 2},
 ... ]).toDF()
 
->>> print(list(df['x'].execute()))
-[1, 2]
-
->>> df['x'] = df['y'] + df['z']
->>> print(list(df['x'].execute()))
-[2, 4]
->>> print(list((df['x'] * 2).execute()))
-[4, 8]
-
->>> print(list(df.execute()))
-[{'x': 2, 'y': 1, 'z': 1}, {'x': 4, 'y': 2, 'z': 2}]
+>>> df = df.withColumn('w', df['y'] + df['z'], int)
+>>> df = df.withColumn('w', df['w'] * 2, int)
+>>> df = df.collect()
+>>> list(df.execute())
+[{'x': 1, 'y': 1, 'z': 1, 'w': 4}, {'x': 2, 'y': 2, 'z': 2, 'w': 8}]
 ```

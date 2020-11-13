@@ -1,11 +1,9 @@
 import logging
 import networkx as nx
 
+from xpark.exceptions import MisconfiguredGraph
+
 _LOG = logging.getLogger(__name__)
-
-
-class MisconfiguredGraph(Exception):
-    pass
 
 
 class BaseExecutor(object):
@@ -32,7 +30,7 @@ class SimpleExecutor(BaseExecutor):
         result_map = {}
         ppg = physical_plan.g
         for op in nx.topological_sort(ppg):
-            _LOG.debug('executing op:%s' % op)
+            _LOG.info('executing op:%s' % op)
             fn = op.get_code()
             if op.reads_data:
                 results = []
@@ -40,7 +38,7 @@ class SimpleExecutor(BaseExecutor):
                     if prev_op.returns_data:
                         results.append(result_map[prev_op])
                     else:
-                        raise MisconfiguredGraph('op:[%s] reads data but prev op:[%s] does not return data' % (op, prev))
+                        raise MisconfiguredGraph('op:[%s] reads data but prev op:[%s] does not return data' % (op, prev_op))
                 result_map[op] = fn(results)
             else:
                 result_map[op] = fn()

@@ -1,9 +1,12 @@
 import networkx as nx
 
+from xpark.exceptions import MisconfiguredGraph
+
 
 class BaseOp(object):
     reads_data = True
     returns_data = True
+    is_terminal = False
 
     def __init__(self, plan, part_id=0):
         self.plan = plan
@@ -26,6 +29,8 @@ class BaseOp(object):
             raise RuntimeError('more than 1 successor')
 
     def add_op(self, op):
+        if self.is_terminal:
+            raise MisconfiguredGraph('terminal ops cant add more ops')
         return op.plan.add_op(self, op)
 
     def execute(self):
@@ -35,11 +40,14 @@ class BaseOp(object):
 class BasePlan(object):
     start_node_class = None
 
-    def __init__(self, ctx, g=None, start_node=None):
+    def __init__(self, ctx, g=None, start_node=None, start_node_class=None):
+        if start_node_class is None:
+            start_node_class = self.start_node_class
+
         self.ctx = ctx
         if g is None:
             self.g = nx.DiGraph()
-            self.start_node = self.start_node_class(self)
+            self.start_node = start_node_class(self)
             self.g.add_node(self.start_node)
         else:
             self.g = g.copy()
@@ -57,3 +65,24 @@ class BasePlan(object):
         new_plan.g.add_edge(from_op, to_op)
         to_op.plan = new_plan
         return new_plan
+
+
+class BaseLogicalPlan(BasePlan):
+    physical_plan_class = None
+
+    def to_physical_plan(self):
+        pplan = self.physical_plan_class(self.ctx)
+        prev_nodes = [pplan.start_node]
+        for n1, n2 in nx.dfs_edges(self.g, source=self.start_node):
+            n2g = n2.get_physical_plan(prev_nodes, pplan)
+            pplan.g.update(n2g)
+            prev_nodes = [x for x in n2g.nodes() if n2g.out_degree(x) == 0 and n2g.in_degree(x) == 1]
+        return pplan
+
+    def execute(self):
+        return self.to_physical_plan().execute()
+
+
+class BasePhysicalPlan(BasePlan):
+    def execute(self):
+        return self.ctx.executor.execute(self)
