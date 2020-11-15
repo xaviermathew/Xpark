@@ -1,6 +1,10 @@
 import csv
+import os
 
-from xpark.dataset.readers import read_parallelized, read_text, read_csv
+from fastparquet import ParquetFile
+from fastparquet.parquet_thrift.parquet.ttypes import Type
+from xpark.dataset.readers import read_parallelized, read_text, read_csv, read_parquet
+from xpark.dataset.writers import write_csv, write_parquet, write_text
 from xpark.plan import dataframe, rdd
 from xpark.utils.iter import get_ranges_for_iterable, get_ranges_for_file
 
@@ -92,3 +96,94 @@ class CSV(Dataset):
 
     def read_chunk(self, start, end):
         return read_csv(self.fname, start, end)
+
+
+class Parquet(Dataset):
+    pq_to_python_type_map = {
+        Type.BOOLEAN: bool,
+        Type.BYTE_ARRAY: str,
+        Type.DOUBLE: float,
+        Type.INT32: int,
+        Type.INT64: int,
+        Type.INT96: int,
+    }
+
+    def __init__(self, ctx, fname, cols=None):
+        self.fname = fname
+        self.pf = ParquetFile(fname)
+        if cols is None:
+            cols = self.pf.columns
+        schema_map = self.pf.schema.root.children
+        schema = {col: self.pq_to_python_type_map[schema_map[col].type]
+                  for col in cols}
+        super(__class__, self).__init__(ctx, schema)
+
+    def get_chunks(self):
+        i = 0
+        for rg in self.pf.row_groups:
+            yield i, i + rg.num_rows
+            i += i + rg.num_rows
+
+    def read_chunk(self, start, end):
+        df = read_parquet(self.fname, start, end)
+        return df.to_dict('records')
+
+    def read_cols_chunk(self, start, end, cols=None):
+        if cols is None:
+            cols = self.cols
+        df = read_parquet(self.fname, start, end, cols)
+        chunk = {col: list(series) for col, series in df.iteritems()}
+        return chunk
+
+
+class Table(Dataset):
+    def __init__(self, ctx, fname, cols=None):
+        self.fname = fname
+        schema = {}
+        super(__class__, self).__init__(ctx, schema)
+
+
+class DatasetWriter(object):
+    def __init__(self, ctx, path):
+        self.ctx = ctx
+        self.path = path
+        os.makedirs(path, exist_ok=True)
+
+    def get_fname(self, part_id):
+        return os.path.join(self.path, str(part_id))
+
+    def chunk_to_records(self, chunk):
+        cols = list(chunk.keys())
+        total = len(chunk[cols[0]])
+        for i in range(total):
+            yield {col: chunk[col][i] for col in cols}
+
+    def write_chunk(self, chunk, part_id):
+        raise NotImplementedError
+
+
+class CSVWriter(DatasetWriter):
+    def write_chunk(self, chunk, part_id):
+        fname = self.get_fname(part_id)
+        data = self.chunk_to_records(chunk)
+        write_csv(fname, data, chunk.keys())
+
+
+class TextWriter(DatasetWriter):
+    def write_chunk(self, chunk, part_id):
+        fname = self.get_fname(part_id)
+        if len(chunk) != 1:
+            raise ValueError('Writing to text needs data with just 1 column')
+
+        lines = map(str, next(chunk.values()))
+        write_text(fname, lines)
+
+
+class ParquetWriter(DatasetWriter):
+    def write_chunk(self, chunk, part_id):
+        fname = self.get_fname(part_id)
+        write_parquet(fname, chunk)
+
+
+class TableWriter(DatasetWriter):
+    pass

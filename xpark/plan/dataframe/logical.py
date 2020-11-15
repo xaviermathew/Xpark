@@ -5,7 +5,7 @@ from xpark.plan.base import BaseOp, BaseLogicalPlan
 from xpark.plan.dataframe.physical import PhysicalStartOp, SerializeChunkOp, \
     DeserializeChunkOp, FilterChunkOp, GroupByChunkOp, GroupByBarrierOp, \
     CollectOp as PhysicalCollectOp, PostGroupByReadOp, ReadDatasetOp as PhysicalReadDatasetOp, SelectChunkOp, \
-    CountChunkOp, AddColumnChunkOp, OrderByChunkOp, PostOrderByReadOp, OrderByBarrierOp, PhysicalPlan
+    CountChunkOp, AddColumnChunkOp, OrderByChunkOp, PostOrderByReadOp, OrderByBarrierOp, PhysicalPlan, WriteChunkOp
 from xpark.plan.dataframe.expr import Expr, NumExpr, StrExpr
 
 
@@ -112,6 +112,22 @@ class LogicalPlanOp(BaseOp):
 
     def collect(self):
         return self.new(CollectOp)
+
+    def toCSV(self, path):
+        from xpark.dataset import CSVWriter
+        return self.new(WriteOp, dataset_writer=CSVWriter(self.plan.ctx, path))
+
+    def toText(self, path):
+        from xpark.dataset import TextWriter
+        return self.new(WriteOp, dataset_writer=TextWriter(self.plan.ctx, path))
+
+    def toParquet(self, path):
+        from xpark.dataset import ParquetWriter
+        return self.new(WriteOp, dataset_writer=ParquetWriter(self.plan.ctx, path))
+
+    def toTable(self, path):
+        from xpark.dataset import TableWriter
+        return self.new(WriteOp, dataset_writer=TableWriter(self.plan.ctx, path))
 
     def get_physical_plan(self, prev_ops, pplan):
         raise NotImplementedError
@@ -253,3 +269,21 @@ class CollectOp(LogicalPlanOp):
 class LogicalPlan(BaseLogicalPlan):
     start_node_class = LogicalStartOp
     physical_plan_class = PhysicalPlan
+
+
+class WriteOp(LogicalPlanOp):
+    returns_data = False
+    is_terminal = True
+
+    def __init__(self, plan, schema, dataset_writer):
+        self.dataset_writer = dataset_writer
+        super(__class__, self).__init__(plan, schema)
+
+    def get_physical_plan(self, prev_ops, pplan):
+        g = nx.DiGraph()
+        for i, prev_op in enumerate(prev_ops):
+            deser_op = DeserializeChunkOp(pplan, self.schema, i)
+            g.add_edge(prev_op, deser_op)
+            op = WriteChunkOp(pplan, self.schema, i, self.dataset_writer)
+            g.add_edge(deser_op, op)
+        return g

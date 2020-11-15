@@ -172,3 +172,16 @@ class ReadDatasetOp(PhysicalPlanOp):
 
 class PhysicalPlan(BasePhysicalPlan):
     start_node_class = PhysicalStartOp
+
+
+class WriteChunkOp(PhysicalPlanOp):
+    returns_data = False
+
+    def __init__(self, plan, schema, part_id, dataset_writer):
+        self.dataset_writer = dataset_writer
+        super(__class__, self).__init__(plan, schema, part_id)
+
+    def get_code(self):
+        def process(chunk):
+            return self.dataset_writer.write_chunk(chunk[0], self.part_id)
+        return process

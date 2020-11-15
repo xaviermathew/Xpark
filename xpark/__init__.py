@@ -1,6 +1,6 @@
 import multiprocessing
 
-from xpark.dataset import List, Text, CSV
+from xpark.dataset import List, Text, CSV, Parquet, Table
 from xpark.executors import Executor
 from xpark.executors.backends import SimpleExecutor
 from xpark.storage import KVStore, GroupByStore, ResultStore
@@ -50,3 +50,9 @@ class Context(object):
 
     def parallelize(self, data):
         return List(self, data)
+
+    def parquet(self, fname, cols=None):
+        return Parquet(self, fname, cols)
+
+    def table(self, fname, cols=None):
+        return Table(self, fname, cols)
