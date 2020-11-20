@@ -126,7 +126,7 @@ class LogicalPlanOp(BaseOp):
         return self.new(WriteOp, dataset_writer=ParquetWriter(self.plan.ctx, path))
 
     def toTable(self, path):
-        from xpark.dataset import TableWriter
+        from xpark.dataset.tables import TableWriter
         return self.new(WriteOp, dataset_writer=TableWriter(self.plan.ctx, path))
 
     def get_physical_plan(self, prev_ops, pplan):
@@ -145,13 +145,12 @@ class LogicalStartOp(BaseOp):
 class ReadDatasetOp(LogicalPlanOp):
     def __init__(self, plan, schema, dataset):
         self.dataset = dataset
-        self.chunks = list(self.dataset.get_chunks())
         super(__class__, self).__init__(plan, schema)
 
     def get_physical_plan(self, prev_ops, pplan):
         g = nx.DiGraph()
-        for i, (start, end) in enumerate(self.chunks):
-            read_op = PhysicalReadDatasetOp(pplan, self.schema, i, self.dataset, start, end)
+        for i in range(len(self.dataset.chunks)):
+            read_op = PhysicalReadDatasetOp(pplan, self.schema, i, self.dataset)
             for prev_op in prev_ops:
                 g.add_edge(prev_op, read_op)
             ser_op = SerializeChunkOp(pplan, self.dataset, part_id=i)

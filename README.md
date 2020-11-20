@@ -2,23 +2,38 @@
  Python implementation of Apache Spark
 
 ## Usage
+### RDD
 ```python
 >>> import xpark
 >>> ctx = xpark.Context()
->>> p = ctx.parallelize(range(10)).collect()
+>>> rdd = ctx.parallelize([{'i': i} for i in range(10)]).toRDD()
 
->>> list(p.execute())
-[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+>>> rdd1 = rdd.collect()
+>>> list(rdd1.execute())
+[{'i': 0},
+ {'i': 1},
+ {'i': 2},
+ {'i': 3},
+ {'i': 4},
+ {'i': 5},
+ {'i': 6},
+ {'i': 7},
+ {'i': 8},
+ {'i': 9}]
 
->>> p = ctx.parallelize(range(10)).map(lambda x: x + 1).filter(lambda x: x > 2).collect()
->>> list(p.execute())
-[3, 4, 5, 6, 7, 8, 9, 10]
+>>> rdd2 = rdd.filter(lambda x: x['i'] > 2)\
+              .map(lambda x: (x['i'] % 2 == 0, x))\
+              .groupByKey()\
+              .collect()
+>>> list(rdd2.execute())
+[(True,
+  [{'i': 10}, {'i': 8}, {'i': 4}, {'i': 6}, {'i': 6}, {'i': 8}, {'i': 4}]),
+ (False,
+  [{'i': 7}, {'i': 9}, {'i': 5}, {'i': 3}, {'i': 9}, {'i': 7}, {'i': 3}, {'i': 5}])]
+```
 
->>> p = ctx.parallelize(range(10)).map(lambda x: (x % 2 == 0, x)).groupByKey().collect()
->>> list(p.execute())
-[(False, [9, 7, 3, 5, 1]), (True, [6, 8, 4, 0, 2])]
-
-
+### Dataframe
+```python
 >>> import xpark
 >>> ctx=xpark.Context()
 >>> df = ctx.parallelize([

@@ -3,7 +3,7 @@ import networkx as nx
 from xpark.plan.base import BaseOp, BaseLogicalPlan
 from xpark.plan.rdd.physical import PhysicalStartOp, SerializeChunkOp, \
     DeserializeChunkOp, MapChunkOp, FilterChunkOp, GroupChunkByKeykOp, GroupByBarrierOp, \
-    CollectOp as PhysicalCollectOp, PostGroupByReadOp, PhysicalPlan
+    CollectOp as PhysicalCollectOp, PostGroupByReadOp, PhysicalPlan, ReadDatasetChunkOp
 
 
 class LogicalPlanOp(BaseOp):
@@ -44,17 +44,14 @@ class LogicalStartOp(BaseOp):
 
 
 class ReadDatasetOp(LogicalPlanOp):
-    physical_plan_op_class = None
-
     def __init__(self, plan, dataset):
         self.dataset = dataset
-        self.chunks = self.dataset.get_chunks()
         super(__class__, self).__init__(plan)
 
     def get_physical_plan(self, prev_ops, pplan):
         g = nx.DiGraph()
-        for i, (start, end) in enumerate(self.chunks):
-            read_op = self.physical_plan_op_class(plan=pplan, start=start, end=end, part_id=i)
+        for i  in range(len(self.dataset.chunks)):
+            read_op = ReadDatasetChunkOp(pplan, i, self.dataset)
             for prev_op in prev_ops:
                 g.add_edge(prev_op, read_op)
             ser_op = SerializeChunkOp(pplan, part_id=i)

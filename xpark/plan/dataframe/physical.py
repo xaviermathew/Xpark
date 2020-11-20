@@ -158,15 +158,13 @@ class DeserializeChunkOp(PhysicalPlanOp):
 class ReadDatasetOp(PhysicalPlanOp):
     reads_data = False
 
-    def __init__(self, plan, schema, part_id, dataset, start, end):
-        self.start = start
-        self.end = end
+    def __init__(self, plan, schema, part_id, dataset):
         self.dataset = dataset
         super(__class__, self).__init__(plan, schema, part_id)
 
     def get_code(self):
         def process():
-            return self.dataset.read_cols_chunk(self.start, self.end, self.schema.keys())
+            return self.dataset.read_cols_chunk(self.part_id, self.schema.keys())
         return process
 
 

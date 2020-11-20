@@ -2,7 +2,21 @@ import itertools
 import math
 import sys
 
-FILE_BYTES_TO_MEM_RATIO = 5
+from xpark import settings
+
+
+def take_pairs(iterable):
+    iterable = iter(iterable)
+    prev = None
+    while True:
+        try:
+            curr = next(iterable)
+        except StopIteration:
+            break
+        else:
+            if prev is not None:
+                yield prev, curr
+            prev = curr
 
 
 def get_line_count(fname):
@@ -23,16 +37,26 @@ def get_chunk_info(line_count, min_chunks, max_chunk_size, avg_row_size):
         return int(math.ceil(num_chunks)), int(math.floor(chunk_size))
 
 
-def get_max_chunk_size_for_file(fname, max_memory, sample_size=100):
+def get_num_bytes_for_sample(fname, sample_size=None):
+    if sample_size is None:
+        sample_size = settings.FILE_INSPECT_SAMPLE_SIZE
     lines = itertools.islice(open(fname), sample_size)
     num_bytes = 0
     num_lines = 0
     for line in lines:
         num_lines += 1
         num_bytes += len(line)
+    return num_lines, num_bytes
 
-    in_memory_bytes = FILE_BYTES_TO_MEM_RATIO * num_bytes
+
+def _get_max_chunk_size_for_file(max_memory, num_lines, num_bytes):
+    in_memory_bytes = settings.FILE_BYTES_TO_MEM_RATIO * num_bytes
     return (max_memory / in_memory_bytes) * num_lines
+
+
+def get_max_chunk_size_for_file(fname, max_memory, sample_size=None):
+    num_lines, num_bytes = get_num_bytes_for_sample(fname, sample_size)
+    return _get_max_chunk_size_for_file(max_memory, num_lines, num_bytes)
 
 
 def get_ranges_for_file(fname, num_executors, max_memory):

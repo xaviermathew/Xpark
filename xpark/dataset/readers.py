@@ -22,7 +22,7 @@ def read_csv(fname, start, end, header=True):
 
 
 def read_text(fname, start, end):
-    data = open(fname).iterlines()
+    data = open(fname)
     return itertools.islice(data, start, end)
 
 

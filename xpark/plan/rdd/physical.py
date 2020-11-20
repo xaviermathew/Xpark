@@ -72,19 +72,17 @@ class GroupByBarrierOp(PhysicalPlanOp):
         return lambda: None
 
 
-class BasePhysicalReadOp(PhysicalPlanOp):
+class ReadDatasetChunkOp(PhysicalPlanOp):
     reads_data = False
     chunk_reader_function = None
 
-    def __init__(self, plan, part_id, start, end, dataset):
-        self.start = start
-        self.end = end
+    def __init__(self, plan, part_id, dataset):
         self.dataset = dataset
-        super(BasePhysicalReadOp, self).__init__(plan, part_id)
+        super(ReadDatasetChunkOp, self).__init__(plan, part_id)
 
     def get_code(self):
         def process():
-            return self.dataset.read_chunk(self.start, self.end)
+            return self.dataset.read_chunk(self.part_id)
         return process
 
 
