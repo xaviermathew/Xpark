@@ -21,15 +21,13 @@
  {'i': 8},
  {'i': 9}]
 
->>> rdd2 = rdd.filter(lambda x: x['i'] > 2)\
-              .map(lambda x: (x['i'] % 2 == 0, x))\
+>>> rdd2 = rdd.map(lambda x: x['i'])\
+              .filter(lambda i: i > 2)\
+              .map(lambda i: (i % 2 == 0, i))\
               .groupByKey()\
               .collect()
 >>> list(rdd2.execute())
-[(True,
-  [{'i': 10}, {'i': 8}, {'i': 4}, {'i': 6}, {'i': 6}, {'i': 8}, {'i': 4}]),
- (False,
-  [{'i': 7}, {'i': 9}, {'i': 5}, {'i': 3}, {'i': 9}, {'i': 7}, {'i': 3}, {'i': 5}])]
+[(False, [9, 7, 3, 5]), (True, [6, 8, 4])]
 ```
 
 ### Dataframe
