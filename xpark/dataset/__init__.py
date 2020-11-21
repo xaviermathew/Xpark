@@ -1,6 +1,6 @@
 import os
 
-from xpark.dataset.readers import read_parallelized, read_text, read_csv, read_parquet
+from xpark.dataset.readers import read_parallelized, read_text, read_csv, read_parquet, pd_read_parallelized
 from xpark.dataset.files import FileList
 from xpark.dataset.writers import write_csv, write_parquet, write_text
 from xpark.plan import dataframe, rdd
@@ -8,6 +8,9 @@ from xpark.utils.iter import get_ranges_for_iterable
 
 
 class Dataset(object):
+    DEST_FORMAT_RDD = 'rdd'
+    DEST_FORMAT_DF = 'df'
+
     def __init__(self, ctx, schema=None):
         self.ctx = ctx
         self.schema = schema
@@ -22,14 +25,14 @@ class Dataset(object):
     def get_chunks(self):
         raise NotImplementedError
 
-    def read_chunk(self, i):
+    def read_chunk(self, dest_format, i):
         raise NotImplementedError
 
-    def read_cols_chunk(self, i, cols=None):
+    def read_cols_chunk(self, dest_format, i, cols=None):
         if cols is None:
             cols = self.cols
         chunk = {col: [] for col in cols}
-        for d in self.read_chunk(i):
+        for d in self.read_chunk(dest_format, i):
             for col in cols:
                 chunk[col].append(d[col])
         return chunk
@@ -64,9 +67,17 @@ class List(Dataset):
             data_repr = data_repr[:10] + '...'
         return '<List:%s>' % data_repr
 
-    def read_chunk(self, i):
+    def read_chunk(self, dest_format, i):
+        from xpark.plan.dataframe.results import Result
+
         chunk = self.chunks[i]
-        return read_parallelized(self.data, chunk.start, chunk.end)
+        if dest_format == self.DEST_FORMAT_RDD:
+            return read_parallelized(self.data, chunk.start, chunk.end)
+        elif dest_format == self.DEST_FORMAT_DF:
+            df = pd_read_parallelized(self.data, chunk.start, chunk.end)
+            return Result.from_df(df)
+        else:
+            raise ValueError('Unknown dest_format')
 
 
 class FileDataset(Dataset):
@@ -79,8 +90,8 @@ class FileDataset(Dataset):
     def chunks(self):
         return self.file_list.chunks
 
-    def read_chunk(self, i):
-        return self.file_list.read_chunk(i)
+    def read_chunk(self, dest_format, i):
+        return self.file_list.read_chunk(dest_format, i)
 
 
 class DatasetWriter(object):

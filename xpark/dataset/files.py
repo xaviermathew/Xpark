@@ -5,7 +5,10 @@ import os
 from fastparquet import ParquetFile as PQFile
 from fastparquet.parquet_thrift.parquet.ttypes import Type
 
-from xpark.dataset import read_csv, read_text, read_parquet
+from xpark.dataset.readers import (
+    pd_read_csv, pd_read_text, pd_read_parquet, read_csv, read_text,
+    read_parquet
+)
 from xpark.utils.iter import get_num_bytes_for_sample, _get_max_chunk_size_for_file, take_pairs
 
 
@@ -48,14 +51,14 @@ class File(object):
             'num_chunks': len(self.chunks),
         }
 
-    def read_chunk(self, start, end):
+    def read_chunk(self, dest_format, start, end):
         raise NotImplementedError
 
-    def read_cols_chunk(self, start, end, cols):
+    def read_cols_chunk(self, dest_format, start, end, cols):
         if cols is None:
             cols = self.schema.keys()
         chunk = {col: [] for col in cols}
-        for d in self.read_chunk(start, end):
+        for d in self.read_chunk(dest_format, start, end):
             for col in cols:
                 chunk[col].append(d[col])
         return chunk
@@ -70,8 +73,17 @@ class CSVFile(File):
             schema = {col: str for col in cols}
         super(__class__, self).__init__(file_list, fname, schema)
 
-    def read_chunk(self, start, end):
-        return read_csv(self.fname, start, end)
+    def read_chunk(self, dest_format, start, end):
+        from xpark.dataset import Dataset
+        from xpark.plan.dataframe.results import Result
+
+        if dest_format == Dataset.DEST_FORMAT_RDD:
+            return read_csv(self.fname, start, end)
+        elif dest_format == Dataset.DEST_FORMAT_DF:
+            df = pd_read_csv(self.fname, start, end)
+            return Result.from_df(df)
+        else:
+            raise ValueError('Unknown dest_format')
 
 
 class TextFile(File):
@@ -80,8 +92,17 @@ class TextFile(File):
     def __init__(self, file_list, fname):
         super(__class__, self).__init__(file_list, fname, schema={self.col_name: str})
 
-    def read_chunk(self, start, end):
-        return read_text(self.fname, start, end)
+    def read_chunk(self, dest_format, start, end):
+        from xpark.dataset import Dataset
+        from xpark.plan.dataframe.results import Result
+
+        if dest_format == Dataset.DEST_FORMAT_RDD:
+            return read_text(self.fname, start, end)
+        elif dest_format == Dataset.DEST_FORMAT_DF:
+            df = pd_read_text(self.fname, start, end)
+            return Result.from_df(df)
+        else:
+            raise ValueError('Unknown dest_format')
 
 
 class ParquetFile(File):
@@ -103,8 +124,17 @@ class ParquetFile(File):
                   for col in cols}
         super(__class__, self).__init__(file_list, fname, schema)
 
-    def read_chunk(self, start, end):
-        return read_parquet(self.fname, start, end)
+    def read_chunk(self, dest_format, start, end):
+        from xpark.dataset import Dataset
+        from xpark.plan.dataframe.results import Result
+
+        if dest_format == Dataset.DEST_FORMAT_RDD:
+            return read_parquet(self.fname, start, end)
+        elif dest_format == Dataset.DEST_FORMAT_DF:
+            df = pd_read_parquet(self.fname, start, end)
+            return Result.from_df(df)
+        else:
+            raise ValueError('Unknown dest_format')
 
 
 class FileList(object):
@@ -144,6 +174,6 @@ class FileList(object):
     def schema(self):
         return self.first.schema
 
-    def read_chunk(self, i):
+    def read_chunk(self, dest_format, i):
         chunk = self.chunks[i]
-        return chunk.file.read_chunk(chunk.start, chunk.end)
+        return chunk.file.read_chunk(dest_format, chunk.start, chunk.end)

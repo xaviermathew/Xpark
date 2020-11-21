@@ -1,45 +1,29 @@
-import multiprocessing
-
+from xpark.settings import settings
 from xpark.dataset import List, FileDataset, FileList
 from xpark.dataset.tables import TableUtil
 from xpark.executors import Executor
-from xpark.executors.backends import SimpleExecutor
 from xpark.storage import KVStore, GroupByStore, ResultStore
 from xpark.plan.dataframe.expr import SimpleEvaluator
-from xpark.storage.backends import InMemoryKVBackend, InMemoryGroupByStoreBackend
 
 
 class Context(object):
-    def __init__(self, num_executors=None, max_memory=None, executor_backend=None,
-                 kv_store_backend=None, groupby_store_backend=None, result_store_backend=None,
-                 expression_evaluator_backend=None):
-        if num_executors is None:
-            num_executors = multiprocessing.cpu_count()
-        self.num_executors = num_executors
+    def __init__(self):
+        self.num_executors = settings.NUM_EXECUTORS
+        self.max_memory = settings.MAX_MEMORY
 
-        if max_memory is None:
-            max_memory = 1024 * 1024
-        self.max_memory = max_memory
-
-        if executor_backend is None:
-            executor_backend = SimpleExecutor(num_executors, max_memory)
+        executor_backend = settings.EXECUTOR_BACKEND(self.num_executors, self.max_memory)
         self.executor = Executor(self, executor_backend)
 
-        if kv_store_backend is None:
-            kv_store_backend = InMemoryKVBackend()
+        kv_store_backend = settings.KV_STORE_BACKEND()
         self.kv_store = KVStore(self, kv_store_backend)
 
-        if groupby_store_backend is None:
-            groupby_store_backend = InMemoryGroupByStoreBackend()
+        groupby_store_backend = settings.GROUPBY_STORE_BACKEND()
         self.groupby_store = GroupByStore(self, groupby_store_backend)
 
-        if result_store_backend is None:
-            result_store_backend = InMemoryKVBackend()
+        result_store_backend = settings.RESULT_STORE_BACKEND()
         self.result_store = ResultStore(self, result_store_backend)
 
-        if expression_evaluator_backend is None:
-            expression_evaluator_backend = SimpleEvaluator(self)
-        self.expression_evaluator_backend = expression_evaluator_backend
+        self.expression_evaluator_backend = settings.EXPRESSION_EVALUATOR_BACKEND(self)
 
         self.job_id = 1
 

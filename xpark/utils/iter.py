@@ -2,7 +2,7 @@ import itertools
 import math
 import sys
 
-from xpark import settings
+from xpark.settings import settings
 
 
 def take_pairs(iterable):
