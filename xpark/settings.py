@@ -23,9 +23,10 @@ KV_STORE_BACKEND = 'xpark.storage.backends.InMemoryKVBackend'
 GROUPBY_STORE_BACKEND = 'xpark.storage.backends.InMemoryGroupByStoreBackend'
 RESULT_STORE_BACKEND = 'xpark.storage.backends.InMemoryKVBackend'
 EXPRESSION_EVALUATOR_BACKEND = 'xpark.plan.dataframe.expr.SimpleEvaluator'
-RESULT_CONTAINER = 'xpark.plan.dataframe.results.SimpleResult'
+# RESULT_CONTAINER = 'xpark.plan.dataframe.results.SimpleResult'
+RESULT_CONTAINER = 'xpark.plan.dataframe.results.PandasResult'
 
-LOG_LEVEL = logging.DEBUG
+LOG_LEVEL = logging.INFO
 logging.basicConfig(level=LOG_LEVEL)
 
 

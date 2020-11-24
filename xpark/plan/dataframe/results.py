@@ -1,3 +1,5 @@
+import pandas as pd
+
 from xpark.settings import settings
 
 
@@ -30,8 +32,19 @@ class Result(object):
     def __len__(self):
         return len(self.data)
 
-    def keys(self):
-        return self.data.keys()
+    @property
+    def cols(self):
+        raise NotImplementedError
+
+    def empty(self):
+        raise NotImplementedError
+
+    @classmethod
+    def empty_from_cols(cls, cols):
+        raise NotImplementedError
+
+    def select(self, cols):
+        raise NotImplementedError
 
 
 class SimpleResult(Result):
@@ -39,8 +52,41 @@ class SimpleResult(Result):
     def from_df(cls, df):
         return cls({k: v.tolist() for k, v in df.iteritems()})
 
+    @property
+    def cols(self):
+        return list(self.data.keys())
+
+    @classmethod
+    def empty(cls):
+        return cls({})
+
+    @classmethod
+    def empty_from_cols(cls, cols):
+        return cls({col: [] for col in cols})
+
+    def select(self, cols):
+        result = self.empty()
+        for col in cols:
+            result[col] = self[col]
+        return self.__class__(result)
+
 
 class PandasResult(Result):
     @classmethod
     def from_df(cls, df):
         return cls(df)
+
+    @property
+    def cols(self):
+        return self.data.columns.to_list()
+
+    @classmethod
+    def empty(cls):
+        return cls(pd.DataFrame())
+
+    @classmethod
+    def empty_from_cols(cls, cols):
+        return cls(pd.DataFrame(columns=cols))
+
+    def select(self, cols):
+        return self.__class__(self.data.filter(cols))

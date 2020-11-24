@@ -35,7 +35,7 @@ class Dataset(object):
         if dest_format == self.DEST_FORMAT_RDD:
             new_chunk = [{k: v for k, v in d.items() if k in cols} for d in chunk]
         elif dest_format == self.DEST_FORMAT_DF:
-            new_chunk = chunk.__class__({col: chunk[col] for col in cols})
+            new_chunk = chunk.select(cols)
         else:
             raise ValueError('Unknown dest_format')
         return new_chunk

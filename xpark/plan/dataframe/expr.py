@@ -1,6 +1,7 @@
 import logging
 import operator
-import types
+
+import pandas as pd
 
 _LOG = logging.getLogger(__name__)
 
@@ -155,51 +156,66 @@ class SimpleEvaluator(object):
         self.ctx = ctx
 
     def apply_expr(self, lhs, operator_str, rhs):
-        _LOG.info('apply_expr - %s %s %s', lhs, operator_str, rhs)
-        is_lhs_gen = isinstance(lhs, (types.GeneratorType, list, tuple))
-        is_rhs_gen = isinstance(rhs, (types.GeneratorType, list, tuple))
-        if is_lhs_gen and is_rhs_gen:
-            lhs = list(lhs)
-            rhs = list(rhs)
-        elif is_lhs_gen and not is_rhs_gen:
-            lhs = list(lhs)
-            rhs = [rhs] * len(lhs)
-        elif not is_lhs_gen and is_rhs_gen:
-            rhs = list(rhs)
-            lhs = [lhs] * len(rhs)
-
+        _LOG.info('apply_expr - (%s) %s (%s)', lhs, operator_str, rhs)
         operator_func = self.expr_operator_map[operator_str]
-        result = []
-        for i, l in enumerate(lhs):
-            result.append(operator_func(l, rhs[i]))
+        is_lhs_iter = isinstance(lhs, (list, tuple))
+        is_rhs_iter = isinstance(rhs, (list, tuple))
+        if is_lhs_iter or is_rhs_iter:
+            if is_lhs_iter and is_rhs_iter:
+                pass
+            elif is_lhs_iter and not is_rhs_iter:
+                rhs = [rhs] * len(lhs)
+            elif not is_lhs_iter and is_rhs_iter:
+                lhs = [lhs] * len(rhs)
+
+            result = []
+            for i, l in enumerate(lhs):
+                result.append(operator_func(l, rhs[i]))
+        elif isinstance(lhs, pd.Series) or isinstance(rhs, pd.Series):
+            result = operator_func(lhs, rhs)
+        else:
+            raise ValueError('unknown result format')
         return result
 
     def chunk_filter(self, chunk, expr):
+        from xpark.plan.dataframe.results import SimpleResult, PandasResult
+
         mask = expr.execute(chunk)
-        cols = list(chunk.keys())
-        total = len(chunk[cols[0]])
-        result = {col: [] for col in cols}
-        for i in range(total):
-            if mask[i]:
-                for col in cols:
-                    result[col].append(chunk[col][i])
+
+        if isinstance(chunk, SimpleResult):
+            cols = list(chunk.cols)
+            total = len(chunk[cols[0]])
+            result = SimpleResult.empty_from_cols(cols)
+            for i in range(total):
+                if mask[i]:
+                    for col in cols:
+                        result[col].append(chunk[col][i])
+        elif isinstance(chunk, PandasResult):
+            result = chunk[mask]
+        else:
+            raise ValueError('unknown result format')
         return result
 
     def chunk_select(self, chunk, cols):
-        result = {}
-        for col in cols:
-            result[col] = chunk[col]
-        return result
+        return chunk.select(cols)
 
     def chunk_add_column(self, chunk, name, expr):
-        result = {}
-        for col in chunk.keys():
-            result[col] = chunk[col]
+        from xpark.plan.dataframe.results import SimpleResult, PandasResult
+
+        if isinstance(chunk, SimpleResult):
+            result = chunk.empty()
+            for col in chunk.cols:
+                result[col] = chunk[col]
+        elif isinstance(chunk, PandasResult):
+            result = chunk
+        else:
+            raise ValueError('unknown result format')
+
         result[name] = expr.execute(chunk)
         return result
 
     def chunk_count(self, chunk):
-        col = next(chunk.keys())
+        col = chunk.cols[0]
         return len(chunk[col])
 
     def chunk_group_by(self, chunk, *expr_set):
