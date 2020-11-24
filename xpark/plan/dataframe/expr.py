@@ -178,39 +178,16 @@ class SimpleEvaluator(object):
         return result
 
     def chunk_filter(self, chunk, expr):
-        from xpark.plan.dataframe.results import SimpleResult, PandasResult
-
         mask = expr.execute(chunk)
-
-        if isinstance(chunk, SimpleResult):
-            cols = list(chunk.cols)
-            total = len(chunk[cols[0]])
-            result = SimpleResult.empty_from_cols(cols)
-            for i in range(total):
-                if mask[i]:
-                    for col in cols:
-                        result[col].append(chunk[col][i])
-        elif isinstance(chunk, PandasResult):
-            result = chunk[mask]
-        else:
-            raise ValueError('unknown result format')
-        return result
+        return chunk.apply_mask(mask)
 
     def chunk_select(self, chunk, cols):
         return chunk.select(cols)
 
     def chunk_add_column(self, chunk, name, expr):
-        from xpark.plan.dataframe.results import SimpleResult, PandasResult
-
-        if isinstance(chunk, SimpleResult):
-            result = chunk.empty()
-            for col in chunk.cols:
-                result[col] = chunk[col]
-        elif isinstance(chunk, PandasResult):
-            result = chunk
-        else:
-            raise ValueError('unknown result format')
-
+        result = chunk.empty()
+        for col in chunk.cols:
+            result[col] = chunk[col]
         result[name] = expr.execute(chunk)
         return result
 

@@ -46,6 +46,9 @@ class Result(object):
     def select(self, cols):
         raise NotImplementedError
 
+    def apply_mask(self, mask):
+        raise NotImplementedError
+
 
 class SimpleResult(Result):
     @classmethod
@@ -70,6 +73,16 @@ class SimpleResult(Result):
             result[col] = self[col]
         return self.__class__(result)
 
+    def apply_mask(self, mask):
+        cols = list(self.cols)
+        total = len(self[cols[0]])
+        result = self.empty_from_cols(cols)
+        for i in range(total):
+            if mask[i]:
+                for col in cols:
+                    result[col].append(self[col][i])
+        return result
+
 
 class PandasResult(Result):
     @classmethod
@@ -90,3 +103,6 @@ class PandasResult(Result):
 
     def select(self, cols):
         return self.__class__(self.data.filter(cols))
+
+    def apply_mask(self, mask):
+        return self.__class__(self.data[mask])
