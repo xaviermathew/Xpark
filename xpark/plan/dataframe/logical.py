@@ -64,14 +64,14 @@ class LogicalPlanOp(BaseOp):
         return list(self.schema.keys())
 
     def new(self, op_class, **kwargs):
-        new_plan = op_class(self.plan, self.schema, **kwargs)
-        new_plan.col_cache = copy.deepcopy(self.col_cache)
-        self.add_op(new_plan)
-        return new_plan
+        new_op = op_class(self.plan, self.schema, **kwargs)
+        # new_plan.col_cache = copy.deepcopy(self.col_cache)
+        self.add_op(new_op)
+        return new_op
 
     def _add_column(self, name, value, data_type):
         self.schema[name] = data_type
-        self.col_cache[name] = value
+        # self.col_cache[name] = value
 
     def count(self):
         return self.new(CountOp)

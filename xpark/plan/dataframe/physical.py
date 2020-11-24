@@ -163,8 +163,10 @@ class ReadDatasetOp(PhysicalPlanOp):
         super(__class__, self).__init__(plan, schema, part_id)
 
     def get_code(self):
+        from xpark.dataset import Dataset
+
         def process():
-            return self.dataset.read_cols_chunk(self.part_id, self.schema.keys())
+            return self.dataset.read_cols_chunk(Dataset.DEST_FORMAT_DF, self.part_id)
         return process
 
 

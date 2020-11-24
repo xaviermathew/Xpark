@@ -12,11 +12,11 @@ class Result(object):
     def __repr__(self):
         return '<%s:%s>' % (self.__class__.__name__, self.data)
 
-    def __getattr__(self, k):
-        return getattr(self.data, k)
-
-    def __setattr__(self, k, v):
-        setattr(self.data, k, v)
+    # def __getattr__(self, k):
+    #     return getattr(self.data, k)
+    #
+    # def __setattr__(self, k, v):
+    #     setattr(self.data, k, v)
 
     def __getitem__(self, k):
         return self.data[k]
@@ -24,8 +24,14 @@ class Result(object):
     def __setitem__(self, k, v):
         self.data[k] = v
 
+    def __delitem__(self, k, v):
+        del self.data[k]
+
     def __len__(self):
         return len(self.data)
+
+    def keys(self):
+        return self.data.keys()
 
 
 class SimpleResult(Result):

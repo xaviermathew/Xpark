@@ -19,7 +19,7 @@ class Chunk(object):
         self.end = end
 
     def __repr__(self):
-        return '<Chunk:%s %s:%s>' % (self.file.fname, self.start, self.end)
+        return '<Chunk:%s %s:%s>' % (self.file.fname if self.file else None, self.start, self.end)
 
 
 class File(object):

@@ -31,11 +31,14 @@ class Dataset(object):
     def read_cols_chunk(self, dest_format, i, cols=None):
         if cols is None:
             cols = self.cols
-        chunk = {col: [] for col in cols}
-        for d in self.read_chunk(dest_format, i):
-            for col in cols:
-                chunk[col].append(d[col])
-        return chunk
+        chunk = self.read_chunk(dest_format, i)
+        if dest_format == self.DEST_FORMAT_RDD:
+            new_chunk = [{k: v for k, v in d.items() if k in cols} for d in chunk]
+        elif dest_format == self.DEST_FORMAT_DF:
+            new_chunk = chunk.__class__({col: chunk[col] for col in cols})
+        else:
+            raise ValueError('Unknown dest_format')
+        return new_chunk
 
     def toDF(self):
         lp = dataframe.logical.LogicalPlan(self.ctx, start_node_class=dataframe.logical.LogicalStartOp)

@@ -1,5 +1,8 @@
+import logging
 import operator
 import types
+
+_LOG = logging.getLogger(__name__)
 
 
 class Expr(object):
@@ -152,6 +155,7 @@ class SimpleEvaluator(object):
         self.ctx = ctx
 
     def apply_expr(self, lhs, operator_str, rhs):
+        _LOG.info('apply_expr - %s %s %s', lhs, operator_str, rhs)
         is_lhs_gen = isinstance(lhs, (types.GeneratorType, list, tuple))
         is_rhs_gen = isinstance(rhs, (types.GeneratorType, list, tuple))
         if is_lhs_gen and is_rhs_gen:
@@ -205,5 +209,6 @@ class SimpleEvaluator(object):
         raise NotImplementedError
 
     def apply_chunk(self, df, operator_str, **kwargs):
+        _LOG.info('apply_chunk - df:%s op:%s(%s)', df, operator_str, kwargs)
         operator_func = getattr(self, 'chunk_%s' % operator_str)
         return operator_func(df, **kwargs)

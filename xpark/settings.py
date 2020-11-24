@@ -1,5 +1,5 @@
 import importlib
-
+import logging
 import multiprocessing
 
 
@@ -25,10 +25,13 @@ RESULT_STORE_BACKEND = 'xpark.storage.backends.InMemoryKVBackend'
 EXPRESSION_EVALUATOR_BACKEND = 'xpark.plan.dataframe.expr.SimpleEvaluator'
 RESULT_CONTAINER = 'xpark.plan.dataframe.results.SimpleResult'
 
+LOG_LEVEL = logging.DEBUG
+logging.basicConfig(level=LOG_LEVEL)
+
 
 class Settings(object):
     def __getattr__(self, item):
-        v = locals()[item]
+        v = globals()[item]
         if isinstance(v, str) and v.startswith('xpark.'):
             v = get_object_from_python_path(v)
         return v
