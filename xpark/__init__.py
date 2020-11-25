@@ -31,7 +31,7 @@ class Context(object):
         return FileDataset(self, fname, FileList.FILE_TYPE_TEXT)
 
     def csv(self, fname):
-        return FileDataset(self, fname, FileList.FILE_TYPE_TEXT)
+        return FileDataset(self, fname, FileList.FILE_TYPE_CSV)
 
     def parallelize(self, data):
         return List(self, data)

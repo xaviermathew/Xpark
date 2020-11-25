@@ -183,5 +183,5 @@ class WriteChunkOp(PhysicalPlanOp):
 
     def get_code(self):
         def process(chunk):
-            return self.dataset_writer.write_chunk(chunk[0], self.part_id)
+            return self.dataset_writer.write_chunk(chunk[0].data, self.part_id)
         return process

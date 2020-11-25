@@ -85,6 +85,7 @@ class List(Dataset):
 
 class FileDataset(Dataset):
     def __init__(self, ctx, path, file_type):
+        self.ctx = ctx  # hack needed for File.__init__()
         self.path = path
         self.file_list = FileList(self, path, file_type)
         super(__class__, self).__init__(ctx, schema=self.file_list.schema)

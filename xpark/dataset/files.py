@@ -1,5 +1,6 @@
 import csv
 import glob
+import math
 import os
 
 from fastparquet import ParquetFile as PQFile
@@ -34,8 +35,8 @@ class File(object):
                                                            self.sample_num_lines,
                                                            self.sample_num_bytes)
         self.num_bytes = os.stat(self.fname).st_size
-        self.num_rows = (self.num_bytes / self.sample_num_bytes) * self.sample_num_lines
-        self.chunk_size = self.num_bytes / self.num_rows
+        self.num_rows = int(math.ceil((self.num_bytes / self.sample_num_bytes) * self.sample_num_lines))
+        self.chunk_size = int(math.ceil(self.num_bytes / self.num_rows))
         self.chunks = []
         for start, end in take_pairs(range(0, self.num_rows, self.chunk_size)):
             self.chunks.append(Chunk(self, start, end))
@@ -67,7 +68,7 @@ class File(object):
 class CSVFile(File):
     def __init__(self, file_list, fname, cols=None):
         if cols is None:
-            with open(self.fname) as f:
+            with open(fname) as f:
                 schema = {col: str for col in csv.DictReader(f).fieldnames}
         else:
             schema = {col: str for col in cols}
@@ -157,11 +158,11 @@ class FileList(object):
         else:
             fnames = [path]
 
-        if fnames:
+        if not fnames:
             raise ValueError('No files under path:%s' % path)
 
         file_class = self.file_type_map[file_type]
-        self.file_list = [file_class(self, f, i) for i, f in enumerate(fnames)]
+        self.file_list = [file_class(self, f) for f in fnames]
         self.chunks = []
         for f in self.file_list:
             self.chunks.extend(f.chunks)

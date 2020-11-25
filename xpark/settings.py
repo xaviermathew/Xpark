@@ -1,6 +1,7 @@
 import importlib
 import logging
 import multiprocessing
+import warnings
 
 
 def get_object_from_python_path(python_path):
@@ -14,7 +15,8 @@ def get_object_from_python_path(python_path):
 FILE_BYTES_TO_MEM_RATIO = 5
 FILE_INSPECT_SAMPLE_SIZE = 100
 
-TABLE_STORAGE_PATH = ''
+TABLE_STORAGE_PATH = '/tmp/xpark/'
+TABLE_STORAGE_FILE_TYPE = 'pq'
 
 NUM_EXECUTORS = multiprocessing.cpu_count()
 MAX_MEMORY = 1024 * 1024
@@ -36,6 +38,18 @@ class Settings(object):
         if isinstance(v, str) and v.startswith('xpark.'):
             v = get_object_from_python_path(v)
         return v
+
+try:
+    from . import local
+except ImportError:
+    try:
+        from . import production
+    except ImportError:
+        warnings.warn('local.py/production.py is missing')
+    else:
+        from .production import *
+else:
+    from .local import *
 
 
 settings = Settings()

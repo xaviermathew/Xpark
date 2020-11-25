@@ -19,7 +19,8 @@ def read_csv(fname, start, end, header=None):
 
 def pd_read_csv(fname, start, end, header=True, cols=None):
     return pd.read_csv(fname, skiprows=start, nrows=end-start,
-                       names=header, usecols=cols)
+                       names=None if header is True else header,
+                       usecols=cols, index_col=False)
 
 
 def read_text(fname, start, end):
