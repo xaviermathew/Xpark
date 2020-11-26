@@ -28,28 +28,18 @@ class File(object):
         self.file_list = file_list
         self.fname = fname
         self.schema = schema
-
-        ctx = self.file_list.dataset.ctx
-        self.sample_num_lines, self.sample_num_bytes = get_num_bytes_for_sample(fname)
-        self.max_chunk_size = _get_max_chunk_size_for_file(ctx.max_memory,
-                                                           self.sample_num_lines,
-                                                           self.sample_num_bytes)
-        self.num_bytes = os.stat(self.fname).st_size
-        self.num_rows = int(math.ceil((self.num_bytes / self.sample_num_bytes) * self.sample_num_lines))
-        self.chunk_size = int(math.ceil(self.num_bytes / self.num_rows))
         self.chunks = []
-        for start, end in take_pairs(range(0, self.num_rows, self.chunk_size)):
-            self.chunks.append(Chunk(self, start, end))
+        self.num_rows = None
+        self.num_bytes = os.stat(self.fname).st_size
 
     def __repr__(self):
         return '<File:%s>' % self.fname
 
     def get_stats(self):
         return {
-            'num_bytes': self.num_bytes,
-            'num_rows': self.num_rows,
-            'chunk_size': self.chunk_size,
             'num_chunks': len(self.chunks),
+            'num_rows': self.num_rows,
+            'num_bytes': self.num_bytes,
         }
 
     def read_chunk(self, dest_format, start, end):
@@ -65,7 +55,26 @@ class File(object):
         return chunk
 
 
-class CSVFile(File):
+class ASCIIFile(File):
+    def __init__(self, file_list, fname, schema):
+        super(__class__, self).__init__(file_list, fname, schema)
+        ctx = self.file_list.dataset.ctx
+        self.sample_num_lines, self.sample_num_bytes = get_num_bytes_for_sample(fname)
+        self.max_chunk_size = _get_max_chunk_size_for_file(ctx.max_memory,
+                                                           self.sample_num_lines,
+                                                           self.sample_num_bytes)
+        self.num_rows = int(math.ceil((self.num_bytes / self.sample_num_bytes) * self.sample_num_lines))
+        self.chunk_size = int(math.ceil(self.num_bytes / self.num_rows))
+        for start, end in take_pairs(range(0, self.num_rows, self.chunk_size)):
+            self.chunks.append(Chunk(self, start, end))
+
+    def get_stats(self):
+        stats = super(__class__, self).get_stats()
+        stats['chunk_size'] = self.chunk_size
+        return stats
+
+
+class CSVFile(ASCIIFile):
     def __init__(self, file_list, fname, cols=None):
         if cols is None:
             with open(fname) as f:
@@ -87,7 +96,7 @@ class CSVFile(File):
             raise ValueError('Unknown dest_format')
 
 
-class TextFile(File):
+class TextFile(ASCIIFile):
     col_name = 'col_0'
 
     def __init__(self, file_list, fname):
@@ -125,6 +134,13 @@ class ParquetFile(File):
                   for col in cols}
         super(__class__, self).__init__(file_list, fname, schema)
 
+        self.num_rows = self.pf.count
+        start = 0
+        for rg in self.pf.row_groups:
+            end = start + rg.num_rows
+            self.chunks.append(Chunk(self, start, end))
+            start += end
+
     def read_chunk(self, dest_format, start, end):
         from xpark.dataset import Dataset
         from xpark.plan.dataframe.results import Result
@@ -154,7 +170,7 @@ class FileList(object):
         if glob.has_magic(path):
             fnames = glob.glob(path)
         elif os.path.isdir(path):
-            fnames = os.listdir(path)
+            fnames = [os.path.join(path, fname) for fname in os.listdir(path)]
         else:
             fnames = [path]
 
@@ -169,7 +185,7 @@ class FileList(object):
 
     @property
     def first(self):
-        return self.file_list[0]
+        return sorted(self.file_list, key=lambda f: f.fname)[0]
 
     @property
     def schema(self):
