@@ -5,13 +5,16 @@ import sys
 from xpark.settings import settings
 
 
-def take_pairs(iterable):
-    iterable = iter(iterable)
+def get_ranges(n, chunk_size):
+    iterable = iter(range(0, n, chunk_size))
     prev = None
+    curr = 0
     while True:
         try:
             curr = next(iterable)
         except StopIteration:
+            if curr < n:
+                yield curr, n - 1
             break
         else:
             if prev is not None:
@@ -27,9 +30,9 @@ def get_line_count(fname):
     return c + 1
 
 
-def get_chunk_info(line_count, min_chunks, max_chunk_size, avg_row_size):
+def get_chunk_info(line_count, min_chunks, max_chunk_size):
     simple_split_chunk_size = int(math.ceil(line_count / min_chunks))
-    if (simple_split_chunk_size * avg_row_size) <= max_chunk_size:
+    if simple_split_chunk_size <= max_chunk_size:
         return min_chunks, simple_split_chunk_size
     else:
         chunk_size = max_chunk_size
@@ -50,8 +53,7 @@ def get_num_bytes_for_sample(fname, sample_size=None):
 
 
 def _get_max_chunk_size_for_file(max_memory, num_lines, num_bytes):
-    in_memory_bytes = settings.FILE_BYTES_TO_MEM_RATIO * num_bytes
-    return (max_memory / in_memory_bytes) * num_lines
+    return int(math.ceil((max_memory / num_bytes) * num_lines))
 
 
 def get_max_chunk_size_for_file(fname, max_memory, sample_size=None):

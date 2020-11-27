@@ -12,7 +12,6 @@ def get_object_from_python_path(python_path):
     return getattr(mod, class_name)
 
 
-FILE_BYTES_TO_MEM_RATIO = 5
 FILE_INSPECT_SAMPLE_SIZE = 100
 
 TABLE_STORAGE_PATH = '/tmp/xpark/'
@@ -27,9 +26,10 @@ RESULT_STORE_BACKEND = 'xpark.storage.backends.InMemoryKVBackend'
 EXPRESSION_EVALUATOR_BACKEND = 'xpark.plan.dataframe.expr.SimpleEvaluator'
 # RESULT_CONTAINER = 'xpark.plan.dataframe.results.SimpleResult'
 RESULT_CONTAINER = 'xpark.plan.dataframe.results.PandasResult'
+PARQUET_COMPRESSION = 'UNCOMPRESSED'
 
 LOG_LEVEL = logging.INFO
-logging.basicConfig(level=LOG_LEVEL)
+LOG_FORMAT = '%(asctime)s:%(levelname)s:%(filename)s:%(lineno)d:%(funcName)s():%(message)s'
 
 
 class Settings(object):
@@ -53,3 +53,4 @@ else:
 
 
 settings = Settings()
+logging.basicConfig(level=LOG_LEVEL, format=LOG_FORMAT)

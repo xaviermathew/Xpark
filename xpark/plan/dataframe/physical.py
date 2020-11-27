@@ -1,3 +1,4 @@
+from xpark import settings
 from xpark.plan.base import BaseOp, BasePhysicalPlan
 from xpark.dataset.readers import read_parallelized
 from xpark.utils.iter import get_ranges_for_iterable
@@ -82,10 +83,8 @@ class OrderByChunkOp(FunctionChunkOp):
 class CollectOp(PhysicalPlanOp):
     def get_code(self):
         def process(all_chunks):
-            col = list(self.cols)[0]
-            for chunk in all_chunks:
-                for i in range(len(chunk[col])):
-                    yield {col: chunk[col][i] for col in self.cols}
+            from xpark.plan.dataframe.results import Result
+            return Result.concat(all_chunks)
         return process
 
 
@@ -104,7 +103,7 @@ class PostGroupByReadOp(PhysicalPlanOp):
         def process():
             # @todo: remove list() and instead add a groupby_store.get_items_for_part_id(self.part_id)
             iterable = list(self.plan.ctx.groupby_store.get_items(self.prev_op.task_id))
-            ranges = list(get_ranges_for_iterable(iterable, self.plan.ctx.num_executors, self.plan.ctx.max_memory))
+            ranges = list(get_ranges_for_iterable(iterable, settings.NUM_EXECUTORS, settings.MAX_MEMORY))
             if self.part_id < len(ranges):
                 start, end = ranges[self.part_id]
                 return read_parallelized(iterable, start, end)
@@ -128,7 +127,7 @@ class PostOrderByReadOp(PhysicalPlanOp):
         def process():
             # @todo: remove list() and instead add a groupby_store.get_items_for_part_id(self.part_id)
             iterable = list(self.plan.ctx.groupby_store.get_items(self.prev_op.task_id))
-            ranges = list(get_ranges_for_iterable(iterable, self.plan.ctx.num_executors, self.plan.ctx.max_memory))
+            ranges = list(get_ranges_for_iterable(iterable, settings.NUM_EXECUTORS, settings.MAX_MEMORY))
             if self.part_id < len(ranges):
                 start, end = ranges[self.part_id]
                 return read_parallelized(iterable, start, end)

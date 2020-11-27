@@ -1,5 +1,6 @@
 import os
 
+from xpark import settings
 from xpark.dataset.readers import read_parallelized, read_text, read_csv, read_parquet, pd_read_parallelized
 from xpark.dataset.files import FileList
 from xpark.dataset.writers import write_csv, write_parquet, write_text
@@ -59,7 +60,7 @@ class List(Dataset):
 
         self.data = data
         self.chunks = []
-        for start, end in get_ranges_for_iterable(data, ctx.num_executors, ctx.max_memory):
+        for start, end in get_ranges_for_iterable(data, settings.NUM_EXECUTORS, settings.MAX_MEMORY):
             self.chunks.append(Chunk(None, start, end))
         schema = {k: type(v) for k, v in data[0].items()}
         super(__class__, self).__init__(ctx, schema)

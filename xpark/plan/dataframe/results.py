@@ -11,6 +11,10 @@ class Result(object):
     def from_df(cls, data):
         return settings.RESULT_CONTAINER.from_df(data)
 
+    @classmethod
+    def concat(cls, result_set):
+        return settings.RESULT_CONTAINER.concat(result_set)
+
     def __repr__(self):
         return '<%s:%s>' % (self.__class__.__name__, self.data)
 
@@ -55,6 +59,11 @@ class SimpleResult(Result):
     def from_df(cls, df):
         return cls({k: v.tolist() for k, v in df.iteritems()})
 
+    @classmethod
+    def concat(cls, result_set):
+        for result in result_set:
+            yield from result.data
+
     @property
     def cols(self):
         return list(self.data.keys())
@@ -88,6 +97,10 @@ class PandasResult(Result):
     @classmethod
     def from_df(cls, df):
         return cls(df)
+
+    @classmethod
+    def concat(cls, result_set):
+        return cls(pd.concat([result.data for result in result_set]))
 
     @property
     def cols(self):

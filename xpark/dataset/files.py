@@ -6,11 +6,13 @@ import os
 from fastparquet import ParquetFile as PQFile
 from fastparquet.parquet_thrift.parquet.ttypes import Type
 
+from xpark import settings
 from xpark.dataset.readers import (
     pd_read_csv, pd_read_text, pd_read_parquet, read_csv, read_text,
     read_parquet
 )
-from xpark.utils.iter import get_num_bytes_for_sample, _get_max_chunk_size_for_file, take_pairs
+from xpark.utils.iter import get_num_bytes_for_sample, _get_max_chunk_size_for_file, get_chunk_info, \
+    get_ranges
 
 
 class Chunk(object):
@@ -58,19 +60,28 @@ class File(object):
 class ASCIIFile(File):
     def __init__(self, file_list, fname, schema):
         super(__class__, self).__init__(file_list, fname, schema)
-        ctx = self.file_list.dataset.ctx
         self.sample_num_lines, self.sample_num_bytes = get_num_bytes_for_sample(fname)
-        self.max_chunk_size = _get_max_chunk_size_for_file(ctx.max_memory,
+        self.avg_row_size = int(math.ceil(self.sample_num_bytes / self.sample_num_lines))
+        self.max_chunk_size = _get_max_chunk_size_for_file(settings.MAX_MEMORY,
                                                            self.sample_num_lines,
                                                            self.sample_num_bytes)
         self.num_rows = int(math.ceil((self.num_bytes / self.sample_num_bytes) * self.sample_num_lines))
-        self.chunk_size = int(math.ceil(self.num_bytes / self.num_rows))
-        for start, end in take_pairs(range(0, self.num_rows, self.chunk_size)):
+        self.num_chunks, self.chunk_size = get_chunk_info(self.num_rows,
+                                                          settings.NUM_EXECUTORS,
+                                                          self.max_chunk_size)
+        pairs = list(get_ranges(self.num_rows, self.chunk_size))
+        for i, (start, end) in enumerate(pairs):
+            if len(pairs) == i + 1:
+                end = None
             self.chunks.append(Chunk(self, start, end))
 
     def get_stats(self):
         stats = super(__class__, self).get_stats()
+        stats['max_chunk_size'] = self.max_chunk_size
+        stats['sample_num_lines'] = self.sample_num_lines
+        stats['sample_num_bytes'] = self.sample_num_bytes
         stats['chunk_size'] = self.chunk_size
+        stats['avg_row_size'] = self.avg_row_size
         return stats
 
 
@@ -136,10 +147,15 @@ class ParquetFile(File):
 
         self.num_rows = self.pf.count
         start = 0
-        for rg in self.pf.row_groups:
-            end = start + rg.num_rows
+        rg_set = self.pf.row_groups
+        for i, rg in enumerate(rg_set):
+            if len(rg_set) == i + 1:
+                end = None
+            else:
+                end = start + rg.num_rows
             self.chunks.append(Chunk(self, start, end))
-            start += end
+            if end is not None:
+                start += end
 
     def read_chunk(self, dest_format, start, end):
         from xpark.dataset import Dataset
@@ -170,7 +186,9 @@ class FileList(object):
         if glob.has_magic(path):
             fnames = glob.glob(path)
         elif os.path.isdir(path):
-            fnames = [os.path.join(path, fname) for fname in os.listdir(path)]
+            fnames = [os.path.join(path, fname)
+                      for fname in os.listdir(path)
+                      if not os.path.basename(fname).startswith('.')]
         else:
             fnames = [path]
 

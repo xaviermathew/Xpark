@@ -8,10 +8,7 @@ from xpark.plan.dataframe.expr import SimpleEvaluator
 
 class Context(object):
     def __init__(self):
-        self.num_executors = settings.NUM_EXECUTORS
-        self.max_memory = settings.MAX_MEMORY
-
-        executor_backend = settings.EXECUTOR_BACKEND(self.num_executors, self.max_memory)
+        executor_backend = settings.EXECUTOR_BACKEND(settings.NUM_EXECUTORS, settings.MAX_MEMORY)
         self.executor = Executor(self, executor_backend)
 
         kv_store_backend = settings.KV_STORE_BACKEND()

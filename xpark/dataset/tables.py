@@ -13,7 +13,8 @@ class TableUtil(object):
     def list(self):
         tables = {}
         for dir_name in os.listdir(settings.TABLE_STORAGE_PATH):
-            if not dir_name.startswith('.'):
+            dir_path = os.path.join(settings.TABLE_STORAGE_PATH, dir_name)
+            if os.path.isdir(dir_path):
                 t = Table(self.ctx, dir_name)
                 tables[t.name] = t
         return tables
