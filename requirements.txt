@@ -1,2 +1,7 @@
 decorator==4.4.2
+fastparquet==0.4.1
+ipython==7.16.1
 networkx==2.4
+pandas==1.1.4
+pdbpp==0.10.2
+tqdm==4.51.0

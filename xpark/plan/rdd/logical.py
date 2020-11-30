@@ -36,7 +36,9 @@ class LogicalPlanOp(BaseOp):
 
 class LogicalStartOp(BaseOp):
     def get_physical_plan(self, prev_ops, pplan):
-        g = nx.DiGraph()
+        from xpark.utils.graph import DiGraph
+
+        g = DiGraph()
         op = PhysicalStartOp(pplan)
         for prev_op in prev_ops:
             g.add_edge(prev_op, op)
@@ -49,7 +51,9 @@ class ReadDatasetOp(LogicalPlanOp):
         super(__class__, self).__init__(plan)
 
     def get_physical_plan(self, prev_ops, pplan):
-        g = nx.DiGraph()
+        from xpark.utils.graph import DiGraph
+
+        g = DiGraph()
         for i  in range(len(self.dataset.chunks)):
             read_op = ReadDatasetChunkOp(pplan, i, self.dataset)
             for prev_op in prev_ops:
@@ -67,7 +71,9 @@ class FunctionOp(LogicalPlanOp):
         super(__class__, self).__init__(plan)
 
     def get_physical_plan(self, prev_ops, pplan):
-        g = nx.DiGraph()
+        from xpark.utils.graph import DiGraph
+
+        g = DiGraph()
         for i, prev_op in enumerate(prev_ops):
             deser_op = DeserializeChunkOp(pplan, part_id=i)
             g.add_edge(prev_op, deser_op)
@@ -88,7 +94,9 @@ class FilterOp(FunctionOp):
 
 class GroupByKeyOp(LogicalPlanOp):
     def get_physical_plan(self, prev_ops, pplan):
-        g = nx.DiGraph()
+        from xpark.utils.graph import DiGraph
+
+        g = DiGraph()
         barrier_op = GroupByBarrierOp(pplan)
         for i, prev_op in enumerate(prev_ops):
             deser_op = DeserializeChunkOp(pplan, part_id=i)
@@ -105,7 +113,9 @@ class GroupByKeyOp(LogicalPlanOp):
 
 class CollectOp(LogicalPlanOp):
     def get_physical_plan(self, prev_ops, pplan):
-        g = nx.DiGraph()
+        from xpark.utils.graph import DiGraph
+
+        g = DiGraph()
         op = PhysicalCollectOp(pplan)
         for i, prev_op in enumerate(prev_ops):
             deser_op = DeserializeChunkOp(pplan, part_id=i)

@@ -7,6 +7,7 @@ class BaseOp(object):
     reads_data = True
     returns_data = True
     is_terminal = False
+    is_pure_compute = False
 
     def __init__(self, plan, part_id=0):
         self.plan = plan
@@ -41,21 +42,26 @@ class BasePlan(object):
     start_node_class = None
 
     def __init__(self, ctx, g=None, start_node=None, start_node_class=None):
+        from xpark.utils.graph import DiGraph
+
         if start_node_class is None:
             start_node_class = self.start_node_class
 
         self.ctx = ctx
         if g is None:
-            self.g = nx.DiGraph()
+            self.g = DiGraph()
             self.start_node = start_node_class(self)
             self.g.add_node(self.start_node)
         else:
             self.g = g.copy()
             self.start_node = start_node
 
-    def clone(self):
-        new_plan = self.__class__(self.ctx, self.g, self.start_node)
+    def clone_with_class(self, klass):
+        new_plan = klass(self.ctx, self.g, self.start_node)
         return new_plan
+
+    def clone(self):
+        return self.clone_with_class(self.__class__)
 
     def execute(self):
         raise NotImplementedError
@@ -80,9 +86,19 @@ class BaseLogicalPlan(BasePlan):
         return pplan
 
     def execute(self):
-        return self.to_physical_plan().execute()
+        return self.to_physical_plan().to_optimized_plan().execute()
 
 
 class BasePhysicalPlan(BasePlan):
+    optimized_plan_class = None
+
+    def to_optimized_plan(self):
+        return self.clone_with_class(self.optimized_plan_class)
+
+    def execute(self):
+        return self.to_optimized_plan().execute()
+
+
+class BaseOptimizedPlan(BasePlan):
     def execute(self):
         return self.ctx.executor.execute(self)

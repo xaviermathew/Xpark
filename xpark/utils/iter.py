@@ -94,5 +94,5 @@ def get_range_pairs(num_rows, chunk_size):
 def get_ranges_for_iterable(iterable, num_executors, max_memory):
     num_rows = len(iterable)
     avg_row_size, max_chunk_size = get_max_chunk_size_for_iterable(iterable, max_memory)
-    num_chunks, chunk_size = get_chunk_info(num_rows, num_executors, max_chunk_size, avg_row_size)
+    num_chunks, chunk_size = get_chunk_info(num_rows, num_executors, max_chunk_size)
     return get_range_pairs(num_rows, chunk_size)

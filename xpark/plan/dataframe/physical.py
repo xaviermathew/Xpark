@@ -1,6 +1,7 @@
 from xpark import settings
 from xpark.plan.base import BaseOp, BasePhysicalPlan
 from xpark.dataset.readers import read_parallelized
+from xpark.plan.dataframe.optimized import OptimizedPlan
 from xpark.utils.iter import get_ranges_for_iterable
 
 
@@ -57,14 +58,17 @@ class FunctionChunkOp(PhysicalPlanOp):
 
 
 class FilterChunkOp(FunctionChunkOp):
+    is_pure_compute = True
     chunk_op = 'filter'
 
 
 class SelectChunkOp(FunctionChunkOp):
+    is_pure_compute = True
     chunk_op = 'select'
 
 
 class AddColumnChunkOp(FunctionChunkOp):
+    is_pure_compute = True
     chunk_op = 'add_column'
 
 
@@ -171,6 +175,13 @@ class ReadDatasetOp(PhysicalPlanOp):
 
 class PhysicalPlan(BasePhysicalPlan):
     start_node_class = PhysicalStartOp
+    optimized_plan_class = OptimizedPlan
+
+    def to_optimized_plan(self):
+        from xpark.plan.dataframe.optimized import OptimizationRule, OptimizedPlan
+        oplan = self.clone_with_class(OptimizedPlan)
+        oplan.g = OptimizationRule.apply_all(self.g)
+        return oplan
 
 
 class WriteChunkOp(PhysicalPlanOp):
