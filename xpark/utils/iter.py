@@ -5,6 +5,20 @@ import sys
 from xpark.settings import settings
 
 
+def take_pairs(iterable):
+    iterable = iter(iterable)
+    prev = None
+    while True:
+        try:
+            curr = next(iterable)
+        except StopIteration:
+            break
+        else:
+            if prev is not None:
+                yield prev, curr
+            prev = curr
+
+
 def get_ranges(n, chunk_size):
     iterable = iter(range(0, n, chunk_size))
     prev = None

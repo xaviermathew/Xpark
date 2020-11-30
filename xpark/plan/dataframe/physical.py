@@ -85,6 +85,8 @@ class OrderByChunkOp(FunctionChunkOp):
 
 
 class CollectOp(PhysicalPlanOp):
+    is_pure_compute = True
+
     def get_code(self):
         def process(all_chunks):
             from xpark.plan.dataframe.results import Result
