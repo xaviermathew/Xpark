@@ -56,6 +56,9 @@ class File(object):
                 chunk[col].append(d[col])
         return chunk
 
+    def get_count(self, dest_format, start, end):
+        return len(self.read_chunk(dest_format, start, end))
+
 
 class ASCIIFile(File):
     def __init__(self, file_list, fname, schema):
@@ -169,6 +172,13 @@ class ParquetFile(File):
         else:
             raise ValueError('Unknown dest_format')
 
+    def get_count(self, dest_format, start, end):
+        for i, rg in enumerate(self.pf.row_groups):
+            chunk = self.chunks[i]
+            if chunk.start == start and chunk.end == end:
+                return rg.num_rows
+        raise ValueError('No chunk matches start:[%s] end:[%s]' % start, end)
+
 
 class FileList(object):
     FILE_TYPE_TEXT = 'txt'
@@ -212,3 +222,7 @@ class FileList(object):
     def read_chunk(self, dest_format, i):
         chunk = self.chunks[i]
         return chunk.file.read_chunk(dest_format, chunk.start, chunk.end)
+
+    def get_count(self, dest_format, i):
+        chunk = self.chunks[i]
+        return chunk.file.get_count(dest_format, chunk.start, chunk.end)

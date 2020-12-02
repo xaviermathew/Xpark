@@ -73,6 +73,7 @@ class AddColumnChunkOp(FunctionChunkOp):
 
 
 class CountChunkOp(FunctionChunkOp):
+    is_pure_compute = True
     chunk_op = 'count'
 
 
@@ -86,6 +87,8 @@ class OrderByChunkOp(FunctionChunkOp):
 
 class CollectOp(PhysicalPlanOp):
     is_pure_compute = True
+    is_terminal = True
+    returns_data = False
 
     def get_code(self):
         def process(all_chunks):
@@ -100,6 +103,15 @@ class GroupByBarrierOp(PhysicalPlanOp):
 
     def get_code(self):
         return lambda: None
+
+
+class SumOp(PhysicalPlanOp):
+    is_pure_compute = True
+    is_terminal = True
+    returns_data = False
+
+    def get_code(self):
+        return sum
 
 
 class PostGroupByReadOp(PhysicalPlanOp):
@@ -162,6 +174,7 @@ class DeserializeChunkOp(PhysicalPlanOp):
 
 class ReadDatasetOp(PhysicalPlanOp):
     reads_data = False
+    is_pure_compute = True
 
     def __init__(self, plan, schema, part_id, dataset):
         self.dataset = dataset
@@ -172,6 +185,21 @@ class ReadDatasetOp(PhysicalPlanOp):
 
         def process():
             return self.dataset.read_cols_chunk(Dataset.DEST_FORMAT_DF, self.part_id)
+        return process
+
+
+class ReadDatasetCountOp(PhysicalPlanOp):
+    reads_data = False
+
+    def __init__(self, plan, schema, part_id, dataset):
+        self.dataset = dataset
+        super(__class__, self).__init__(plan, schema, part_id)
+
+    def get_code(self):
+        from xpark.dataset import Dataset
+
+        def process():
+            return self.dataset.get_count(Dataset.DEST_FORMAT_DF, self.part_id)
         return process
 
 

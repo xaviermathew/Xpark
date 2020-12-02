@@ -1,11 +1,12 @@
 import copy
-import networkx as nx
 
 from xpark.plan.base import BaseOp, BaseLogicalPlan
-from xpark.plan.dataframe.physical import PhysicalStartOp, SerializeChunkOp, \
-    DeserializeChunkOp, FilterChunkOp, GroupByChunkOp, GroupByBarrierOp, \
-    CollectOp as PhysicalCollectOp, PostGroupByReadOp, ReadDatasetOp as PhysicalReadDatasetOp, SelectChunkOp, \
-    CountChunkOp, AddColumnChunkOp, OrderByChunkOp, PostOrderByReadOp, OrderByBarrierOp, PhysicalPlan, WriteChunkOp
+from xpark.plan.dataframe.physical import (
+    PhysicalStartOp, SerializeChunkOp, DeserializeChunkOp, FilterChunkOp, GroupByChunkOp,
+    GroupByBarrierOp, CollectOp as PhysicalCollectOp, PostGroupByReadOp, ReadDatasetOp as PhysicalReadDatasetOp,
+    SelectChunkOp, CountChunkOp, AddColumnChunkOp, OrderByChunkOp, PostOrderByReadOp,
+    OrderByBarrierOp, PhysicalPlan, WriteChunkOp, SumOp
+)
 from xpark.plan.dataframe.expr import Expr, NumExpr, StrExpr
 
 
@@ -195,16 +196,6 @@ class SelectOp(FunctionOp):
     physical_plan_op_class = SelectChunkOp
 
 
-# class MapOp(FunctionOp):
-#     physical_plan_op_class = MapChunkOp
-
-
-class CountOp(FunctionOp):
-    returns_data = False
-    is_terminal = True
-    physical_plan_op_class = CountChunkOp
-
-
 class LimitOp(LogicalPlanOp):
     def __init__(self, plan, schema, limit):
         self.limit = limit
@@ -277,15 +268,27 @@ class CollectOp(LogicalPlanOp):
         return g
 
 
+class CountOp(LogicalPlanOp):
+    def get_physical_plan(self, prev_ops, pplan):
+        from xpark.utils.graph import DiGraph
+
+        g = DiGraph()
+        sum_op = SumOp(pplan, self.schema)
+        for i, prev_op in enumerate(prev_ops):
+            deser_op = DeserializeChunkOp(pplan, self.schema, i)
+            g.add_edge(prev_op, deser_op)
+            count_op = CountChunkOp(pplan, self.schema, i)
+            g.add_edge(deser_op, count_op)
+            g.add_edge(count_op, sum_op)
+        return g
+
+
 class LogicalPlan(BaseLogicalPlan):
     start_node_class = LogicalStartOp
     physical_plan_class = PhysicalPlan
 
 
 class WriteOp(LogicalPlanOp):
-    returns_data = False
-    is_terminal = True
-
     def __init__(self, plan, schema, dataset_writer):
         self.dataset_writer = dataset_writer
         super(__class__, self).__init__(plan, schema)

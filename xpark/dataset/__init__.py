@@ -41,6 +41,9 @@ class Dataset(object):
             raise ValueError('Unknown dest_format')
         return new_chunk
 
+    def get_count(self, dest_format, i):
+        raise NotImplementedError
+
     def toDF(self):
         lp = dataframe.logical.LogicalPlan(self.ctx, start_node_class=dataframe.logical.LogicalStartOp)
         op = dataframe.logical.ReadDatasetOp(lp, self.schema, self)
@@ -83,6 +86,9 @@ class List(Dataset):
         else:
             raise ValueError('Unknown dest_format')
 
+    def get_count(self, dest_format, i):
+        return len(self.read_chunk(dest_format, i))
+
 
 class FileDataset(Dataset):
     def __init__(self, ctx, path, file_type):
@@ -97,6 +103,9 @@ class FileDataset(Dataset):
 
     def read_chunk(self, dest_format, i):
         return self.file_list.read_chunk(dest_format, i)
+
+    def get_count(self, dest_format, i):
+        return self.file_list.get_count(dest_format, i)
 
 
 class DatasetWriter(object):

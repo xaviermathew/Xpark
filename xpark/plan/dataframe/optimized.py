@@ -21,7 +21,7 @@ class OptimizationRule(object):
         return self.rule_str.strip()
 
     def transform_path(self, path, g):
-        return g
+        return path
 
     def replace_path(self, g, path, new_path):
         g = g.copy()
@@ -75,9 +75,19 @@ class PushDownSelect(OptimizationRule):
 
 class PushDownCount(OptimizationRule):
     rule_str = '''
-    MATCH (start:Readdatasetop)-[*]->(end:Countchunkop)
-    RETURN start, end
+    MATCH (start:Physicalstartop)-->(read:Readdatasetop)-->(count:Countchunkop)-->(sum:Sumop)
+    RETURN start, read, count, sum
     '''
+
+    def transform_path(self, path, g):
+        from xpark.plan.dataframe.physical import ReadDatasetCountOp
+
+        start_op = path[0]
+        read_op = path[1]
+        sum_op = path[-1]
+        new_read_op = ReadDatasetCountOp(dataset=read_op.dataset, schema=read_op.schema,
+                                         plan=read_op.plan, part_id=read_op.part_id)
+        return [start_op, new_read_op, sum_op]
 
 
 class PushDownFilter(OptimizationRule):
@@ -89,9 +99,9 @@ class PushDownFilter(OptimizationRule):
 
 rule_classes = [
     PruneSerialization,
-    PushDownSelect,
+    # PushDownSelect,
     PushDownCount,
-    PushDownFilter,
+    # PushDownFilter,
 ]
 
 
