@@ -184,7 +184,7 @@ class ReadDatasetOp(PhysicalPlanOp):
         from xpark.dataset import Dataset
 
         def process():
-            return self.dataset.read_cols_chunk(Dataset.DEST_FORMAT_DF, self.part_id)
+            return self.dataset.read_cols_chunk(Dataset.DEST_FORMAT_DF, self.part_id, cols=self.schema.keys())
         return process
 
 

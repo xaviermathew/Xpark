@@ -32,18 +32,18 @@ class Expr(object):
         new_op.operator_str = operator_str
         return new_op
 
-    @staticmethod
-    def from_pair(ctx, x, y, operator_str):
-        if not isinstance(x, Expr):
-            x = Expr(ctx, x)
-        if not isinstance(y, Expr):
-            y = Expr(ctx, y)
+    @classmethod
+    def from_pair(cls, ctx, x, y, operator_str):
+        if not isinstance(x, cls):
+            x = cls(ctx, x)
+        if not isinstance(y, cls):
+            y = cls(ctx, y)
         return x.from_children(y, operator_str)
 
-    @staticmethod
-    def from_unary(ctx, x, operator_str):
-        if not isinstance(x, Expr):
-            x = Expr(ctx, x)
+    @classmethod
+    def from_unary(cls, ctx, x, operator_str):
+        if not isinstance(x, cls):
+            x = cls(ctx, x)
         return x.from_children(None, operator_str)
 
     def execute_binary_expression(self, lhs, operator_str, rhs):
@@ -96,36 +96,36 @@ class Expr(object):
 
 class NumExpr(Expr):
     def __sub__(self, rhs):
-        return Expr.from_pair(self.ctx, self, rhs, '-')
+        return NumExpr.from_pair(self.ctx, self, rhs, '-')
 
     def __mul__(self, rhs):
-        return Expr.from_pair(self.ctx, self, rhs, '*')
+        return NumExpr.from_pair(self.ctx, self, rhs, '*')
 
     def __floordiv__(self, rhs):
-        return Expr.from_pair(self.ctx, self, rhs, '/')
+        return NumExpr.from_pair(self.ctx, self, rhs, '/')
 
     def __gt__(self, rhs):
-        return Expr.from_pair(self.ctx, self, rhs, '>')
+        return NumExpr.from_pair(self.ctx, self, rhs, '>')
 
     def __ge__(self, rhs):
-        return Expr.from_pair(self.ctx, self, rhs, '>=')
+        return NumExpr.from_pair(self.ctx, self, rhs, '>=')
 
     def __lt__(self, rhs):
-        return Expr.from_pair(self.ctx, self, rhs, '<')
+        return NumExpr.from_pair(self.ctx, self, rhs, '<')
 
     def __le__(self, rhs):
-        return Expr.from_pair(self.ctx, self, rhs, '<=')
+        return NumExpr.from_pair(self.ctx, self, rhs, '<=')
 
 
 class StrExpr(Expr):
     def startswith(self, rhs):
-        return Expr.from_pair(self.ctx, self, rhs, 'startswith')
+        return StrExpr.from_pair(self.ctx, self, rhs, 'startswith')
 
     def endswith(self, rhs):
-        return Expr.from_pair(self.ctx, self, rhs, 'endswith')
+        return StrExpr.from_pair(self.ctx, self, rhs, 'endswith')
 
     def contains(self, rhs):
-        return Expr.from_pair(self.ctx, self, rhs, 'contains')
+        return StrExpr.from_pair(self.ctx, self, rhs, 'contains')
 
     # def substr(self, start_idx, length):
     #     return Expr.from_pair(self.ctx, self, rhs, 'substr')

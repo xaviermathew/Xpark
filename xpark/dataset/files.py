@@ -1,5 +1,6 @@
 import csv
 import glob
+import logging
 import math
 import os
 
@@ -13,6 +14,8 @@ from xpark.dataset.readers import (
 )
 from xpark.utils.iter import get_num_bytes_for_sample, _get_max_chunk_size_for_file, get_chunk_info, \
     get_ranges
+
+_LOG = logging.getLogger(__name__)
 
 
 class Chunk(object):
@@ -160,17 +163,20 @@ class ParquetFile(File):
             if end is not None:
                 start += end
 
-    def read_chunk(self, dest_format, start, end):
+    def read_chunk(self, dest_format, start, end, cols=None):
         from xpark.dataset import Dataset
         from xpark.plan.dataframe.results import Result
 
         if dest_format == Dataset.DEST_FORMAT_RDD:
-            return read_parquet(self.fname, start, end)
+            return read_parquet(self.fname, start, end, cols)
         elif dest_format == Dataset.DEST_FORMAT_DF:
-            df = pd_read_parquet(self.fname, start, end)
+            df = pd_read_parquet(self.fname, start, end, cols)
             return Result.from_df(df)
         else:
             raise ValueError('Unknown dest_format')
+
+    def read_cols_chunk(self, dest_format, start, end, cols=None):
+        return self.read_chunk(dest_format, start, end, cols)
 
     def get_count(self, dest_format, start, end):
         for i, rg in enumerate(self.pf.row_groups):
@@ -221,7 +227,13 @@ class FileList(object):
 
     def read_chunk(self, dest_format, i):
         chunk = self.chunks[i]
+        _LOG.info('fname:[%s] start:[%s] end:[%s]', chunk.file.fname, chunk.start, chunk.end)
         return chunk.file.read_chunk(dest_format, chunk.start, chunk.end)
+
+    def read_cols_chunk(self, dest_format, i, cols=None):
+        chunk = self.chunks[i]
+        _LOG.info('fname:[%s] start:[%s] end:[%s] cols:[%s]', chunk.file.fname, chunk.start, chunk.end, cols)
+        return chunk.file.read_cols_chunk(dest_format, chunk.start, chunk.end, cols)
 
     def get_count(self, dest_format, i):
         chunk = self.chunks[i]

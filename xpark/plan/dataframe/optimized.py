@@ -68,9 +68,23 @@ class PruneSerialization(OptimizationRule):
 
 class PushDownSelect(OptimizationRule):
     rule_str = '''
-    MATCH (start:Readdatasetop)-[*]->(end:Selectchunkop)
-    RETURN start, end
+    MATCH (first)-->(read:Readdatasetop)-[*]->(select:Selectchunkop)-->(last)
+    RETURN first, read, nodes, select, last
     '''
+
+    def transform_path(self, path, g):
+        from xpark.plan.dataframe.physical import ReadDatasetOp
+
+        first_op = path[0]
+        read_op = path[1]
+        select_op = path[-2]
+        last_op = path[-1]
+        new_schema = {}
+        new_read_op = ReadDatasetOp(dataset=read_op.dataset, schema=new_schema,
+                                    plan=read_op.plan, part_id=read_op.part_id)
+        for col in select_op.ac_kwargs['cols']:
+            new_schema[col] = read_op.schema[col]
+        return [first_op, new_read_op] + path[2:-2] + [last_op]
 
 
 class PushDownCount(OptimizationRule):
@@ -92,16 +106,16 @@ class PushDownCount(OptimizationRule):
 
 class PushDownFilter(OptimizationRule):
     rule_str = '''
-    MATCH (start:Readdatasetop)-[*]->(end:Filterchunkop)
-    RETURN start, end
+    MATCH (read:Readdatasetop)-[*]->(filter:Filterchunkop)
+    RETURN read, filter
     '''
 
 
 rule_classes = [
     PruneSerialization,
-    # PushDownSelect,
-    PushDownCount,
+    PushDownSelect,
     # PushDownFilter,
+    PushDownCount,
 ]
 
 

@@ -104,6 +104,9 @@ class FileDataset(Dataset):
     def read_chunk(self, dest_format, i):
         return self.file_list.read_chunk(dest_format, i)
 
+    def read_cols_chunk(self, dest_format, i, cols=None):
+        return self.file_list.read_cols_chunk(dest_format, i, cols)
+
     def get_count(self, dest_format, i):
         return self.file_list.get_count(dest_format, i)
 

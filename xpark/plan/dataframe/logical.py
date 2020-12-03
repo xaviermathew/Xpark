@@ -38,6 +38,7 @@ class StrCol(Col):
 class LogicalPlanOp(BaseOp):
     data_type_map = {
         int: NumCol,
+        float: NumCol,
         str: StrCol,
         None: Col
     }
@@ -85,8 +86,8 @@ class LogicalPlanOp(BaseOp):
     def filter(self, expr):
         return self.new(FilterOp, expr=expr)
 
-    def select(self, *expr_set):
-        return self.new(SelectOp, expr_set=expr_set)
+    def select(self, *cols):
+        return self.new(SelectOp, cols=cols)
 
     # def agg(self):
     #     pass
