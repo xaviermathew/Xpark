@@ -210,7 +210,7 @@ class PhysicalPlan(BasePhysicalPlan):
     def to_optimized_plan(self):
         from xpark.plan.dataframe.optimized import OptimizationRule, OptimizedPlan
         oplan = self.clone_with_class(OptimizedPlan)
-        oplan.g = OptimizationRule.apply_all(self.g)
+        oplan.g, oplan.stats = OptimizationRule.apply_all(self.g)
         return oplan
 
 

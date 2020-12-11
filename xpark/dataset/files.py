@@ -211,6 +211,7 @@ class FileList(object):
         if not fnames:
             raise ValueError('No files under path:%s' % path)
 
+        self.file_type = file_type
         file_class = self.file_type_map[file_type]
         self.file_list = [file_class(self, f) for f in fnames]
         self.chunks = []

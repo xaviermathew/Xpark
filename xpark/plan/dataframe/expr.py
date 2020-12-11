@@ -47,7 +47,13 @@ class Expr(object):
         return x.from_children(None, operator_str)
 
     def execute_binary_expression(self, lhs, operator_str, rhs):
-        return self.ctx.expression_evaluator_backend.apply_expr(lhs, operator_str, rhs)
+        from xpark.utils.context import CURR_EVALUATOR_BACKEND
+
+        if CURR_EVALUATOR_BACKEND is None:
+            evaluator = self.ctx.expression_evaluator_backend
+        else:
+            evaluator = CURR_EVALUATOR_BACKEND
+        return evaluator.apply_expr(lhs, operator_str, rhs)
 
     def execute_node(self, chunk):
         from xpark.plan.dataframe.logical import Col

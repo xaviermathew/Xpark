@@ -24,7 +24,15 @@ class Col(object):
         return self.expr_class(self.df.plan.ctx, self)
 
     def execute(self, chunk):
-        return chunk[self.name]
+        from fastparquet.parquet_thrift.parquet.ttypes import RowGroup
+        from xpark.plan.dataframe.results import Result
+
+        if isinstance(chunk, Result):
+            return chunk[self.name]
+        elif isinstance(chunk, RowGroup):
+            return [col for col in chunk.columns if '.'.join(col.meta_data.path_in_schema) == self.name][0]
+        else:
+            raise ValueError('Dont know how to execute type:%s' % type(chunk))
 
 
 class NumCol(Col):
