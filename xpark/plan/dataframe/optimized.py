@@ -153,7 +153,7 @@ class PruneChunks(OptimizationRule):
     def transform_path(self, path, g):
         from xpark.dataset import FileDataset
         from xpark.dataset.files import FileList
-        from xpark.dataset.utils import pq_filter_chunks
+        from xpark.dataset.utils import pq_prune_chunks_min_max
         from xpark.plan.dataframe.physical import FilterChunkOp
 
         first_op = path[0]
@@ -169,10 +169,64 @@ class PruneChunks(OptimizationRule):
                 else:
                     combined_filter = combined_filter & op_filter
 
-            to_keep = set(pq_filter_chunks(read_op.dataset, combined_filter))
+            to_keep = set(pq_prune_chunks_min_max(read_op.dataset, combined_filter))
             if read_op.part_id not in to_keep:
                 new_path = [first_op]
                 stats = {'skip': read_op.part_id}
+                return new_path, stats
+        return path, {}
+
+
+class UseIndexForFilter(OptimizationRule):
+    rule_str = '''
+    MATCH (first)-->(read:Readdatasetop)-[*]->(last: {is_terminal: "True"})
+    RETURN first, read, nodes, last
+    '''
+    # '''
+    # MATCH p=(read:Readdatasetop)-[*]->(filter:Filterchunkop)-[*]->(last)
+    # RETURN nodes(p)
+    # '''
+
+    def transform_path(self, path, g):
+        from xpark.dataset.tables import Table
+        from xpark.plan.dataframe.physical import PostIndexFilterChunkOp, ReadIndexFilterChunkOp, FilterChunkOp
+
+        # import pdb;pdb.set_trace()
+        first_op = path[0]
+        read_op = path[1]
+        table = read_op.dataset
+        filter_ops = [(i, op) for i, op in enumerate(path) if isinstance(op, FilterChunkOp)]
+        if filter_ops and isinstance(table, Table):
+            op_idx, filter_op = filter_ops[0]
+            expr = filter_op.ac_kwargs['expr']
+            indexed_cols, index_expr, extra_cols, extra_expr = table.extract_cols_from_expr(expr, filter_op.schema)
+            if indexed_cols:
+                new_path = [first_op]
+                if extra_cols:
+                    new_path.append(read_op)
+                new_path.extend(path[2:op_idx])
+                new_index_filter_op = ReadIndexFilterChunkOp(
+                    plan=filter_op.plan,
+                    schema=filter_op.schema,
+                    part_id=filter_op.part_id,
+                    table=table,
+                    expr=index_expr,
+                    augment_cols=indexed_cols + extra_cols
+                )
+                new_path.append(new_index_filter_op)
+                if extra_expr:
+                    new_filter_op = PostIndexFilterChunkOp(
+                        plan=filter_op.plan, schema=filter_op.schema,
+                        part_id=filter_op.part_id, expr=extra_expr
+                    )
+                    new_path.append(new_filter_op)
+                new_path.extend(path[op_idx + 1:])
+                stats = {
+                    'indexed_cols': indexed_cols,
+                    'index_expr': index_expr,
+                    'extra_cols': extra_cols,
+                    'extra_expr': extra_expr
+                }
                 return new_path, stats
         return path, {}
 
@@ -182,6 +236,7 @@ rule_classes = [
     PushDownImplicitSelect,
     PushDownSelect,
     PruneChunks,
+    UseIndexForFilter,
     PushDownCount,
 ]
 

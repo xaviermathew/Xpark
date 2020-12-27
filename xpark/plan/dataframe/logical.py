@@ -26,11 +26,16 @@ class Col(object):
     def execute(self, chunk):
         from fastparquet.parquet_thrift.parquet.ttypes import RowGroup
         from xpark.plan.dataframe.results import Result
+        from xpark.dataset.utils import RowGroupEvalRequest
 
-        if isinstance(chunk, Result):
+        if callable(chunk):
+            return chunk(self)
+        elif isinstance(chunk, Result):
             return chunk[self.name]
         elif isinstance(chunk, RowGroup):
             return [col for col in chunk.columns if '.'.join(col.meta_data.path_in_schema) == self.name][0]
+        elif isinstance(chunk, RowGroupEvalRequest):
+            return chunk.to_rowgroupcolevalrequest(self.name)
         else:
             raise ValueError('Dont know how to execute type:%s' % type(chunk))
 
@@ -135,9 +140,9 @@ class LogicalPlanOp(BaseOp):
         from xpark.dataset import ParquetWriter
         return self.new(WriteOp, dataset_writer=ParquetWriter(self.plan.ctx, path))
 
-    def toTable(self, path):
-        from xpark.dataset.tables import TableWriter
-        return self.new(WriteOp, dataset_writer=TableWriter(self.plan.ctx, path))
+    def toTable(self, path, **options):
+        from xpark.dataset.tables import TableWriterMixin
+        return self.new(WriteOp, dataset_writer=TableWriterMixin.get_table_class()(self.plan.ctx, path, **options))
 
     def get_physical_plan(self, prev_ops, pplan):
         raise NotImplementedError

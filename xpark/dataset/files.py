@@ -27,6 +27,12 @@ class Chunk(object):
     def __repr__(self):
         return '<Chunk:%s %s:%s>' % (self.file.fname if self.file else None, self.start, self.end)
 
+    def read_chunk(self, dest_format):
+        return self.file.read_chunk(dest_format, self.start, self.end)
+
+    def read_cols_chunk(self, dest_format, cols):
+        return self.file.read_chunk(dest_format, self.start, self.end, cols)
+
 
 class File(object):
     def __init__(self, file_list, fname, schema):
@@ -204,7 +210,7 @@ class FileList(object):
         elif os.path.isdir(path):
             fnames = [os.path.join(path, fname)
                       for fname in os.listdir(path)
-                      if not os.path.basename(fname).startswith('.')]
+                      if os.path.isfile(os.path.join(path, fname)) and not os.path.basename(fname).startswith('.')]
         else:
             fnames = [path]
 
@@ -213,7 +219,7 @@ class FileList(object):
 
         self.file_type = file_type
         file_class = self.file_type_map[file_type]
-        self.file_list = [file_class(self, f) for f in fnames]
+        self.file_list = [file_class(self, f) for f in sorted(fnames)]
         self.chunks = []
         for f in self.file_list:
             self.chunks.extend(f.chunks)

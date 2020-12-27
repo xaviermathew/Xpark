@@ -162,7 +162,9 @@ class SimpleEvaluator(object):
         self.ctx = ctx
 
     def apply_expr(self, lhs, operator_str, rhs):
-        _LOG.info('apply_expr - (%s) %s (%s)', lhs, operator_str, rhs)
+        lhs_repr = 'Col:%s' % lhs.name if isinstance(lhs, pd.Series) else lhs
+        rhs_repr = 'Col:%s' % rhs.name if isinstance(rhs, pd.Series) else rhs
+        _LOG.info('apply_expr - (%s) %s (%s)', lhs_repr, operator_str, rhs_repr)
         operator_func = self.expr_operator_map[operator_str]
         is_lhs_iter = isinstance(lhs, (list, tuple))
         is_rhs_iter = isinstance(rhs, (list, tuple))
@@ -207,7 +209,7 @@ class SimpleEvaluator(object):
     def chunk_order_by(self, chunk, *expr_set):
         raise NotImplementedError
 
-    def apply_chunk(self, df, operator_str, **kwargs):
-        _LOG.info('apply_chunk - df:%s op:%s(%s)', df, operator_str, kwargs)
+    def apply_chunk(self, chunk, operator_str, **kwargs):
+        _LOG.info('apply_chunk - %s:%s op:%s(%s)', chunk.__class__.__name__, chunk.cols, operator_str, kwargs)
         operator_func = getattr(self, 'chunk_%s' % operator_str)
-        return operator_func(df, **kwargs)
+        return operator_func(chunk, **kwargs)

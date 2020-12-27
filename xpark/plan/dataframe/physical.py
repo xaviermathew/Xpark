@@ -203,17 +203,6 @@ class ReadDatasetCountOp(PhysicalPlanOp):
         return process
 
 
-class PhysicalPlan(BasePhysicalPlan):
-    start_node_class = PhysicalStartOp
-    optimized_plan_class = OptimizedPlan
-
-    def to_optimized_plan(self):
-        from xpark.plan.dataframe.optimized import OptimizationRule, OptimizedPlan
-        oplan = self.clone_with_class(OptimizedPlan)
-        oplan.g, oplan.stats = OptimizationRule.apply_all(self.g)
-        return oplan
-
-
 class WriteChunkOp(PhysicalPlanOp):
     returns_data = False
 
@@ -225,3 +214,35 @@ class WriteChunkOp(PhysicalPlanOp):
         def process(chunk):
             return self.dataset_writer.write_chunk(chunk[0].data, self.part_id)
         return process
+
+
+class ReadIndexFilterChunkOp(PhysicalPlanOp):
+    reads_data = False  # might read data if the prev op is a ReadDatasetOp
+    is_pure_compute = True
+
+    def __init__(self, plan, schema, part_id, table, expr, augment_cols):
+        self.table = table
+        self.expr =  expr
+        self.augment_cols = augment_cols
+        super(__class__, self).__init__(plan, schema, part_id)
+
+    def get_code(self):
+        def process(chunk=None):
+            return self.table.get_rids(self.part_id, self.expr, self.augment_cols, chunk)
+        return process
+
+
+class PostIndexFilterChunkOp(FunctionChunkOp):
+    is_pure_compute = True
+    chunk_op = 'filter'
+
+
+class PhysicalPlan(BasePhysicalPlan):
+    start_node_class = PhysicalStartOp
+    optimized_plan_class = OptimizedPlan
+
+    def to_optimized_plan(self):
+        from xpark.plan.dataframe.optimized import OptimizationRule, OptimizedPlan
+        oplan = self.clone_with_class(OptimizedPlan)
+        oplan.g, oplan.stats = OptimizationRule.apply_all(self.g)
+        return oplan

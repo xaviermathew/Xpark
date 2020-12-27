@@ -14,7 +14,9 @@ def get_object_from_python_path(python_path):
 
 FILE_INSPECT_SAMPLE_SIZE = 100
 
-TABLE_STORAGE_PATH = '/tmp/xpark/'
+ROOT_PATH = '/tmp/xpark/'
+TABLE_STORAGE_PATH = ROOT_PATH + 'tables/'
+TMP_PATH = ROOT_PATH + 'tmp/'
 TABLE_STORAGE_FILE_TYPE = 'pq'
 
 NUM_EXECUTORS = multiprocessing.cpu_count()

@@ -117,8 +117,20 @@ class DatasetWriter(object):
         self.path = path
         os.makedirs(path, exist_ok=True)
 
-    def get_fname(self, part_id):
-        return os.path.join(self.path, str(part_id))
+    @staticmethod
+    def _get_fname(path, part_id, col=None, value=None, purpose=None):
+        parts = [path]
+        if purpose is not None:
+            parts.append(purpose)
+        if col is not None:
+            parts.append(col)
+        if value is not None:
+            parts.append(str(value))
+        parts.append(str(part_id))
+        return os.path.join(*parts)
+
+    def get_fname(self, part_id, col=None, value=None, purpose=None):
+        return self._get_fname(self.path, part_id=part_id, col=col, value=value, purpose=purpose)
 
     def chunk_to_records(self, chunk):
         cols = list(chunk.keys())
