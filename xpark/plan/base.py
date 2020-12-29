@@ -8,6 +8,7 @@ class BaseOp(object):
     returns_data = True
     is_terminal = False
     is_pure_compute = False
+    mutates_graph = False
 
     def __init__(self, plan, part_id=0):
         self.plan = plan
