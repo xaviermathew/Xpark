@@ -2,7 +2,6 @@ import csv
 import os
 
 import fastparquet
-import pandas as pd
 from fastparquet.util import default_mkdirs
 from tqdm import tqdm
 
@@ -24,7 +23,9 @@ def write_text(fname, lines):
 
 
 def write_parquet(fname, chunk, **kwargs):
-    if not isinstance(chunk, pd.DataFrame):
-        chunk = pd.DataFrame(chunk)
+    from xpark.plan.dataframe.results import Result
+
+    if isinstance(chunk, Result):
+        chunk = chunk.data
     default_mkdirs(os.path.dirname(fname))
     fastparquet.write(fname, chunk, compression=settings.PARQUET_COMPRESSION, **kwargs)

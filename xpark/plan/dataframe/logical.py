@@ -1,12 +1,12 @@
 import copy
 
+from xpark import settings
 from xpark.plan.base import BaseOp, BaseLogicalPlan
 from xpark.plan.dataframe.physical import (
     PhysicalStartOp, SerializeChunkOp, DeserializeChunkOp, FilterChunkOp, GroupByChunkOp,
     GroupByBarrierOp, CollectOp as PhysicalCollectOp, PostGroupByReadOp, ReadDatasetOp as PhysicalReadDatasetOp,
-    SelectChunkOp, CountChunkOp, AddColumnChunkOp, OrderByChunkOp, PostOrderByReadOp,
-    OrderByBarrierOp, PhysicalPlan, WriteChunkOp, SumOp
-)
+    SelectChunkOp, CountChunkOp, AddColumnChunkOp, CalculateRangesOp, PhysicalPlan, WriteChunkOp, SumOp,
+    RangePartitionChunkOp, SampleChunkOp, RangePartitionBarrierOp)
 from xpark.plan.dataframe.expr import Expr, NumExpr, StrExpr
 
 
@@ -102,6 +102,9 @@ class LogicalPlanOp(BaseOp):
     def select(self, *cols):
         return self.new(SelectOp, cols=cols)
 
+    def sample(self, col, ratio):
+        return self.new(SampleOp, col=col, ratio=ratio)
+
     # def agg(self):
     #     pass
 
@@ -122,8 +125,8 @@ class LogicalPlanOp(BaseOp):
     def limit(self, n):
         return self.new(LimitOp, n=n)
 
-    def orderBy(self, *expr_set):
-        return self.new(OrderByOp, expr_set=expr_set)
+    def sort(self, *sort_cols):
+        return self.new(SortOp, sort_cols=sort_cols)
 
     def collect(self):
         return self.new(CollectOp)
@@ -210,6 +213,10 @@ class SelectOp(FunctionOp):
     physical_plan_op_class = SelectChunkOp
 
 
+class SampleOp(FunctionOp):
+    physical_plan_op_class = SampleChunkOp
+
+
 class LimitOp(LogicalPlanOp):
     def __init__(self, plan, schema, limit):
         self.limit = limit
@@ -223,26 +230,41 @@ class JoinOp(LogicalPlanOp):
         super(__class__, self).__init__(plan, schema)
 
 
-class OrderByOp(LogicalPlanOp):
-    def __init__(self, plan, schema, expr_set=None):
-        self.expr_set = expr_set
+class SortOp(LogicalPlanOp):
+    def __init__(self, plan, schema, sort_cols):
+        self.sort_cols = sort_cols
         super(__class__, self).__init__(plan, schema)
 
     def get_physical_plan(self, prev_ops, pplan):
         from xpark.utils.graph import DiGraph
 
         g = DiGraph()
-        barrier_op = OrderByBarrierOp(pplan, self.schema)
+        cr_op = CalculateRangesOp(pplan, self.schema, self.sort_cols)
+        rpb = RangePartitionBarrierOp(pplan, self.schema, self.sort_cols)
         for i, prev_op in enumerate(prev_ops):
-            deser_op = DeserializeChunkOp(pplan, self.schema, i)
-            g.add_edge(prev_op, deser_op)
-            op = OrderByChunkOp(pplan, self.schema, i)
-            g.add_edge(deser_op, op)
-            g.add_edge(op, barrier_op)
-            pgbr_op = PostOrderByReadOp(pplan, self.schema, i)
-            g.add_edge(barrier_op, pgbr_op)
-            pgbr_deser_op = SerializeChunkOp(pplan, self.schema, i)
-            g.add_edge(pgbr_op, pgbr_deser_op)
+            deser_op1 = DeserializeChunkOp(pplan, self.schema, i)
+            g.add_edge(prev_op, deser_op1)
+            s_op = SampleChunkOp(pplan, self.schema, i, cols=self.sort_cols,
+                                 ratio=settings.RANGE_PARTITIONER_SAMPLE_RATIO)
+            g.add_edge(deser_op1, s_op)
+            ser_op1 = SerializeChunkOp(pplan, self.schema, i)
+            g.add_edge(s_op, ser_op1)
+
+            deser_op2 = DeserializeChunkOp(pplan, self.schema, i)
+            g.add_edge(ser_op1, deser_op2)
+            g.add_edge(deser_op2, cr_op)
+            ser_op2 = SerializeChunkOp(pplan, self.schema, i)
+            g.add_edge(cr_op, ser_op2)
+
+            deser_op3 = DeserializeChunkOp(pplan, self.schema, i)
+            g.add_edge(ser_op2, deser_op3)
+            rpc_op = RangePartitionChunkOp(pplan, self.schema, i, self.sort_cols)
+            g.add_edge(deser_op1, rpc_op)
+            g.add_edge(deser_op3, rpc_op)
+            ser_op3 = SerializeChunkOp(pplan, self.schema, i)
+            g.add_edge(rpc_op, ser_op3)
+
+            g.add_edge(ser_op3, rpb)
         return g
 
 

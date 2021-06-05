@@ -53,3 +53,14 @@ class ResultStore(BaseStore):
 
     def clear(self):
         return self.backend.clear()
+
+
+class AppendableResultStore(BaseStore):
+    def get(self, task_id):
+        return self.backend.get(task_id)
+
+    def append(self, task_id, value):
+        return self.backend.append(task_id, value)
+
+    def clear(self):
+        return self.backend.clear()

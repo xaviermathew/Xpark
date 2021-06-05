@@ -4,6 +4,7 @@ import networkx as nx
 class DiGraph(nx.DiGraph):
     def add_node(self, node_for_adding, **attr):
         attr['class'] = node_for_adding.__class__.__name__.title()
+        attr['task_id'] = node_for_adding.task_id
         attr['is_pure_compute'] = str(node_for_adding.is_pure_compute)
         attr['is_terminal'] = str(node_for_adding.is_terminal)
         return super(__class__, self).add_node(node_for_adding, **attr)

@@ -1,6 +1,9 @@
 import logging
+import math
 import operator
 
+import functools
+import numpy as np
 import pandas as pd
 
 _LOG = logging.getLogger(__name__)
@@ -192,6 +195,29 @@ class SimpleEvaluator(object):
     def chunk_select(self, chunk, cols):
         return chunk.select(cols)
 
+    def chunk_sample(self, chunk, cols, ratio):
+        size = int(math.ceil(ratio * len(chunk)))
+        results = [np.random.choice(chunk[col].values, size=size) for col in cols]
+        return results
+
+    def chunk_range_partition(self, chunk, sort_cols, ranges):
+        from xpark.plan.dataframe.results import RangePartitionedResult
+
+        masks = []
+        for i, range_set in enumerate(ranges):
+            mask = []
+            for ll, ul in range_set:
+                arr = chunk[sort_cols[i]]
+                mask.append((ll <= arr) & (arr < ul))
+            masks.append(mask)
+
+        col_masks = [functools.reduce(operator.and_, [mask[i] for mask in masks]) for i in range(len(masks[0]))]
+        results = []
+        for i, mask in enumerate(col_masks):
+            partition = chunk[mask].sort_values(by=list(sort_cols))
+            results.append(RangePartitionedResult(partition, sort_cols, ranges, range_id=i))
+        return results
+
     def chunk_add_column(self, chunk, name, expr):
         result = chunk.empty()
         for col in chunk.cols:
@@ -203,10 +229,10 @@ class SimpleEvaluator(object):
         col = chunk.cols[0]
         return len(chunk[col])
 
-    def chunk_group_by(self, chunk, *expr_set):
+    def chunk_group_by(self, chunk, cols):
         raise NotImplementedError
 
-    def chunk_order_by(self, chunk, *expr_set):
+    def chunk_sort(self, chunk, cols):
         raise NotImplementedError
 
     def apply_chunk(self, chunk, operator_str, **kwargs):

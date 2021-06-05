@@ -1,16 +1,13 @@
 from xpark import settings
 from xpark.plan.base import BaseOp, BasePhysicalPlan
 from xpark.dataset.readers import read_parallelized
+from xpark.plan.rdd.optimized import OptimizedPlan
 from xpark.utils.iter import get_ranges_for_iterable
 
 
 class PhysicalPlanOp(BaseOp):
     def __repr__(self):
         return '<%s>' % self.task_id
-
-    @property
-    def task_id(self):
-        return '%s.%s.%s' % (self.plan.ctx.job_id, self.__class__.__name__, self.part_id)
 
     def get_code(self):
         raise NotImplementedError
@@ -106,7 +103,8 @@ class PostGroupByReadOp(PhysicalPlanOp):
 
 
 class SerializeChunkOp(PhysicalPlanOp):
-    returns_data = False
+    returns_data = True
+    return_data_type = PhysicalPlanOp.return_data_type_result_store
 
     def get_code(self):
         def process(chunk):
@@ -125,3 +123,4 @@ class DeserializeChunkOp(PhysicalPlanOp):
 
 class PhysicalPlan(BasePhysicalPlan):
     start_node_class = PhysicalStartOp
+    optimized_plan_class = OptimizedPlan

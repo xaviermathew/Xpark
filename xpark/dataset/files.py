@@ -57,13 +57,18 @@ class File(object):
         raise NotImplementedError
 
     def read_cols_chunk(self, dest_format, start, end, cols):
+        from xpark.plan.dataframe.results import Result
+
         if cols is None:
             cols = self.schema.keys()
-        chunk = {col: [] for col in cols}
-        for d in self.read_chunk(dest_format, start, end):
-            for col in cols:
-                chunk[col].append(d[col])
-        return chunk
+        # chunk = {col: [] for col in cols}
+        # for d in self.read_chunk(dest_format, start, end):
+        #     for col in cols:
+        #         chunk[col].append(d[col])
+        # return chunk
+        result = self.read_chunk(dest_format, start, end)
+        chunk_df = result[cols]
+        return Result.from_df(chunk_df)
 
     def get_count(self, dest_format, start, end):
         return len(self.read_chunk(dest_format, start, end))

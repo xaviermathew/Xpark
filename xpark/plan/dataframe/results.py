@@ -119,3 +119,56 @@ class PandasResult(Result):
 
     def apply_mask(self, mask):
         return self.__class__(self.data[mask])
+
+
+class RangePartitionedResult(object):
+    def __init__(self, data, sort_cols, ranges, range_id):
+        self.data = data
+        self.sort_cols = sort_cols
+        self.ranges = ranges
+        self.range_id = range_id
+
+    def __repr__(self):
+        ranges_repr = ','.join(['%s[%s:%s]' % (self.sort_cols[i], *range_set[self.range_id])
+                                for i, range_set in enumerate(self.ranges)])
+        return '<%s [%s]>' % (self.__class__.__name__, ranges_repr)
+
+    def __getitem__(self, k):
+        return self.data[k]
+
+    def __setitem__(self, k, v):
+        self.data[k] = v
+
+    def __delitem__(self, k, v):
+        del self.data[k]
+
+    def __len__(self):
+        return len(self.data)
+
+
+class ResultProxy(object):
+    def __init__(self, op):
+        self.op = op
+        self.object_fn = self.get_object
+        self._object = None
+
+    def get_object(self):
+        if self._object is None:
+            ctx = self.op.plan.ctx
+            self._object = getattr(ctx, self.op.return_data_type).get(self.op.task_id)
+        return self._object
+
+    def __getattr__(self, k):
+        return getattr(self.__dict__['object_fn'](), k)
+
+    def __getitem__(self, k):
+        return self.__dict__['object_fn']()[k]
+
+    def __setitem__(self, k, v):
+        self.__dict__['object_fn']()[k] = v
+
+    def __delitem__(self, k, v):
+        del self.__dict__['object_fn']()[k]
+
+    def __len__(self):
+        return len(self.__dict__['object_fn']())

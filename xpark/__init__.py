@@ -2,7 +2,7 @@ from xpark.settings import settings
 from xpark.dataset import List, FileDataset, FileList
 from xpark.dataset.tables import TableUtil
 from xpark.executors import Executor
-from xpark.storage import KVStore, GroupByStore, ResultStore
+from xpark.storage import KVStore, GroupByStore, ResultStore, AppendableResultStore
 from xpark.plan.dataframe.expr import SimpleEvaluator
 
 
@@ -13,6 +13,9 @@ class Context(object):
 
         kv_store_backend = settings.KV_STORE_BACKEND()
         self.kv_store = KVStore(self, kv_store_backend)
+
+        appendable_result_store_backend = settings.APPENDABLE_RESULT_STORE_BACKEND()
+        self.appendable_result_store = AppendableResultStore(self, appendable_result_store_backend)
 
         groupby_store_backend = settings.GROUPBY_STORE_BACKEND()
         self.groupby_store = GroupByStore(self, groupby_store_backend)

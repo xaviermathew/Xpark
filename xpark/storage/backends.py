@@ -23,6 +23,12 @@ class InMemoryKVBackend(BaseInMemoryBackend):
     def set(self, key, value):
         self.data[key] = value
 
+    def append(self, key, value):
+        if key not in self.data:
+            self.data[key] = [value]
+        else:
+            self.data[key].append(value)
+
 
 class InMemoryGroupByStoreBackend(BaseInMemoryBackend):
     data = IN_MEMORY_GROUPBY_DATA

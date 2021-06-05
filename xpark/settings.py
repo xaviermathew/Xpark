@@ -13,16 +13,21 @@ def get_object_from_python_path(python_path):
 
 
 FILE_INSPECT_SAMPLE_SIZE = 100
+RANGE_PARTITIONER_SAMPLE_RATIO = 0.01
+RANGE_PARTITIONER_NUM_RANGES_RATIO = 0.00001
+EXTERNAL_SORT_MAX_INPUT_BUFFERS = 10
 
 ROOT_PATH = '/tmp/xpark/'
 TABLE_STORAGE_PATH = ROOT_PATH + 'tables/'
 TMP_PATH = ROOT_PATH + 'tmp/'
 TABLE_STORAGE_FILE_TYPE = 'pq'
+ENABLE_OPTIMIZER = True
 
 NUM_EXECUTORS = multiprocessing.cpu_count()
 MAX_MEMORY = 1024 * 1024
 EXECUTOR_BACKEND = 'xpark.executors.backends.SimpleExecutor'
 KV_STORE_BACKEND = 'xpark.storage.backends.InMemoryKVBackend'
+APPENDABLE_RESULT_STORE_BACKEND = 'xpark.storage.backends.InMemoryKVBackend'
 GROUPBY_STORE_BACKEND = 'xpark.storage.backends.InMemoryGroupByStoreBackend'
 RESULT_STORE_BACKEND = 'xpark.storage.backends.InMemoryKVBackend'
 EXPRESSION_EVALUATOR_BACKEND = 'xpark.plan.dataframe.expr.SimpleEvaluator'

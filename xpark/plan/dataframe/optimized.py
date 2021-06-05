@@ -4,6 +4,7 @@ import logging
 import networkx as nx
 from networkx.classes.function import add_path
 from python_cypher import python_cypher
+from xpark import settings
 from xpark.plan.base import BaseOptimizedPlan
 from xpark.utils.iter import take_pairs
 
@@ -191,7 +192,6 @@ class UseIndexForFilter(OptimizationRule):
         from xpark.dataset.tables import Table
         from xpark.plan.dataframe.physical import PostIndexFilterChunkOp, ReadIndexFilterChunkOp, FilterChunkOp
 
-        # import pdb;pdb.set_trace()
         first_op = path[0]
         read_op = path[1]
         table = read_op.dataset
@@ -231,14 +231,16 @@ class UseIndexForFilter(OptimizationRule):
         return path, {}
 
 
-rule_classes = [
-    PruneSerialization,
-    PushDownImplicitSelect,
-    PushDownSelect,
-    PruneChunks,
-    UseIndexForFilter,
-    PushDownCount,
-]
+rule_classes = []
+if settings.ENABLE_OPTIMIZER:
+    rule_classes.extend([
+        PruneSerialization,
+        PushDownImplicitSelect,
+        PushDownSelect,
+        PruneChunks,
+        UseIndexForFilter,
+        PushDownCount,
+    ])
 
 
 class OptimizedPlan(BaseOptimizedPlan):

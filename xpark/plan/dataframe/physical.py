@@ -1,3 +1,8 @@
+from collections import defaultdict
+import heapq
+
+from tqdm import tqdm
+
 from xpark import settings
 from xpark.plan.base import BaseOp, BasePhysicalPlan
 from xpark.dataset.readers import read_parallelized
@@ -16,10 +21,6 @@ class PhysicalPlanOp(BaseOp):
     @property
     def cols(self):
         return list(self.schema.keys())
-
-    @property
-    def task_id(self):
-        return '%s.%s.%s' % (self.plan.ctx.job_id, self.__class__.__name__, self.part_id)
 
     def get_code(self):
         raise NotImplementedError
@@ -81,14 +82,10 @@ class GroupByChunkOp(FunctionChunkOp):
     chunk_op = 'group_by'
 
 
-class OrderByChunkOp(FunctionChunkOp):
-    chunk_op = 'order_by'
-
-
 class CollectOp(PhysicalPlanOp):
     is_pure_compute = True
     is_terminal = True
-    returns_data = False
+    returns_data = True
 
     def get_code(self):
         def process(all_chunks):
@@ -130,12 +127,114 @@ class PostGroupByReadOp(PhysicalPlanOp):
         return process
 
 
-class OrderByBarrierOp(PhysicalPlanOp):
-    reads_data = False
-    returns_data = False
+class SampleChunkOp(FunctionChunkOp):
+    chunk_op = 'sample'
+    is_pure_compute = True
+
+
+class CalculateRangesOp(PhysicalPlanOp):
+    def __init__(self, plan, schema, sort_cols):
+        self.sort_cols = sort_cols
+        super(__class__, self).__init__(plan, schema)
 
     def get_code(self):
-        return lambda: None
+        def process(all_samples):
+            from xpark.utils.partitioning import get_ranges_from_samples
+            return get_ranges_from_samples(all_samples)
+        return process
+
+
+class RangePartitionChunkOp(PhysicalPlanOp):
+    chunk_op = 'range_partition'
+
+    def __init__(self, plan, schema, part_id, sort_cols):
+        self.sort_cols = sort_cols
+        super(__class__, self).__init__(plan, schema, part_id)
+
+    def get_code(self):
+        def process(chunk_ranges_pair):
+            from xpark.plan.dataframe.results import Result, ResultProxy
+
+            chunk, ranges = chunk_ranges_pair
+            if isinstance(ranges, (Result, ResultProxy)):
+                chunk, ranges = ranges, chunk
+
+            return self.plan.ctx.expression_evaluator_backend.apply_chunk(
+                chunk, self.chunk_op, sort_cols=self.sort_cols, ranges=ranges
+            )
+        return process
+
+
+class RangePartitionBarrierOp(PhysicalPlanOp):
+    returns_ops = True
+
+    def __init__(self, plan, schema, sort_cols):
+        self.sort_cols = sort_cols
+        super(__class__, self).__init__(plan, schema)
+
+    def get_code(self):
+        def process(all_partitioned_chunks):
+            from xpark.utils.iter import get_ranges
+
+            rp_results = defaultdict(list)
+            for partitions in all_partitioned_chunks:
+                for partition in partitions:
+                    rp_results[partition.range_id].append(partition)
+
+            new_pp = self.plan.clone()
+            tasks = defaultdict(list)
+            level = 0
+            for range_id, partitions in rp_results.items():
+                while True:
+                    if level == 0:
+                        prev_ops = [self] * len(partitions)
+                    else:
+                        prev_ops = tasks[level - 1]
+                    k_prev_op_ranges = list(get_ranges(len(prev_ops), settings.EXTERNAL_SORT_MAX_INPUT_BUFFERS))
+                    for i, (ll, ul) in enumerate(k_prev_op_ranges):
+                        op = MergeSortedChunksOp(self.plan, self.schema, self.sort_cols, range_id, level, ll, ul)
+                        k_prev_ops = prev_ops[ll:ul] if ll != ul else prev_ops[ll:]
+                        for prev_op in k_prev_ops:
+                            new_pp.g.add_edge(prev_op, op)
+                        tasks[level].append(op)
+                    if len(k_prev_op_ranges) == 1:
+                        break
+                    else:
+                        level += 1
+            return rp_results, new_pp
+        return process
+
+
+class MergeSortedChunksOp(PhysicalPlanOp):
+    return_data_type = PhysicalPlanOp.return_data_type_appendable_result_store
+
+    def __init__(self, plan, schema, sort_cols, range_id, level, ll, ul):
+        self.sort_cols = sort_cols
+        self.range_id = range_id
+        self.level = level
+        self.ll = ll
+        self.ul = ul
+        super(__class__, self).__init__(plan, schema)
+
+    @property
+    def task_id(self):
+        parts = [self.plan.ctx.job_id, self.__class__.__name__, self.part_id,
+                 ','.join(sorted(self.sort_cols)), self.range_id, self.level]
+        return '.'.join(map(str, parts))
+
+    def get_code(self):
+        def process(partitions):
+            partitions = partitions[0]
+            if isinstance(partitions, dict):
+                range_partitions = partitions[self.range_id]
+                partitions = range_partitions[self.ll:self.ul] if self.ll != self.ul else range_partitions[self.ll:]
+            else:
+                pass
+            merged = heapq.merge(*[p.data.to_dict('records') for p in partitions], key=lambda d: tuple([d[col] for col in self.sort_cols]))
+            result_store = self.plan.ctx.appendable_result_store
+            for item in tqdm(merged, desc='merging'):
+                result_store.append(self.task_id, item)
+        return process
 
 
 class PostOrderByReadOp(PhysicalPlanOp):
@@ -155,7 +254,8 @@ class PostOrderByReadOp(PhysicalPlanOp):
 
 
 class SerializeChunkOp(PhysicalPlanOp):
-    returns_data = False
+    returns_data = True
+    return_data_type = PhysicalPlanOp.return_data_type_result_store
 
     def get_code(self):
         def process(chunk):
@@ -212,7 +312,7 @@ class WriteChunkOp(PhysicalPlanOp):
 
     def get_code(self):
         def process(chunk):
-            return self.dataset_writer.write_chunk(chunk[0].data, self.part_id)
+            return self.dataset_writer.write_chunk(chunk[0], self.part_id)
         return process
 
 

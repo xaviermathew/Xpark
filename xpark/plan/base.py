@@ -8,7 +8,14 @@ class BaseOp(object):
     returns_data = True
     is_terminal = False
     is_pure_compute = False
-    mutates_graph = False
+    returns_ops = False
+
+    return_data_type_simple = 'simple'
+    return_data_type_kv_store = 'kv_store'
+    return_data_type_result_store = 'result_store'
+    return_data_type_appendable_result_store = 'appendable_result_store'
+    return_data_type_groupby_store = 'groupby_store'
+    return_data_type = return_data_type_simple
 
     def __init__(self, plan, part_id=0):
         self.plan = plan
@@ -37,6 +44,10 @@ class BaseOp(object):
 
     def execute(self):
         return self.plan.execute()
+
+    @property
+    def task_id(self):
+        return '%s.%s.%s' % (self.plan.ctx.job_id, self.__class__.__name__, self.part_id)
 
 
 class BasePlan(object):

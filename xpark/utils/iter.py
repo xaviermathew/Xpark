@@ -110,3 +110,14 @@ def get_ranges_for_iterable(iterable, num_executors, max_memory):
     avg_row_size, max_chunk_size = get_max_chunk_size_for_iterable(iterable, max_memory)
     num_chunks, chunk_size = get_chunk_info(num_rows, num_executors, max_chunk_size)
     return get_range_pairs(num_rows, chunk_size)
+
+
+def chunkify(iterable, n):
+    it = iter(iterable)
+    while True:
+        chunk_it = itertools.islice(it, n)
+        try:
+            first_el = next(chunk_it)
+        except StopIteration:
+            return
+        yield itertools.chain((first_el,), chunk_it)

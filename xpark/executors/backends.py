@@ -16,7 +16,8 @@ class PlanTraversor(object):
 
     def update_physical_plan(self, physical_plan):
         self.ops = list(nx.topological_sort(physical_plan.g))
-        self.prev_plans.append(self.physical_plan)
+        if self.physical_plan is not None:
+            self.prev_plans.append(self.physical_plan)
         self.physical_plan = physical_plan
 
     def is_done(self):
@@ -53,6 +54,9 @@ class BaseExecutor(object):
         raise NotImplementedError
 
     def execute(self, physical_plan):
+        from xpark.plan.base import BaseOp
+        from xpark.plan.dataframe.results import ResultProxy
+
         pt = PlanTraversor(physical_plan)
         op = None
         while not pt.is_done():
@@ -69,12 +73,17 @@ class BaseExecutor(object):
                 op_result = self.execute_op(op, fn, results)
             else:
                 op_result = self.execute_op(op, fn)
-            if op.mutates_graph:
-                result, new_physical_plan = op_result
-                pt.result_map[op] = result
-                pt.update_physical_plan(new_physical_plan)
+
+            if op.returns_data:
+                if op.returns_ops:
+                    op_result, physical_plan = op_result
+                    pt.update_physical_plan(physical_plan)
+                if op.return_data_type == BaseOp.return_data_type_simple:
+                    pt.result_map[op] = op_result
+                else:
+                    pt.result_map[op] = ResultProxy(op)
             else:
-                pt.result_map[op] = op_result
+                pt.result_map[op] = None
         return pt.result_map[op]
 
 
